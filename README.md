@@ -1,5 +1,7 @@
 # go-portScan
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/XinRoom/go-portScan.svg)](https://pkg.go.dev/github.com/XinRoom/go-portScan)
+
 高性能端口扫描器
 
 High-performance port scanner.
