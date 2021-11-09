@@ -168,19 +168,19 @@ go build cmd/go-portScan.go
 
 ## Cmd Usage
 
-`.\go-portScan.exe -ip 1.1.1.1/30 [-nP] [-sT] [-sV] [-rate num] [-rateP num] [-timeout num(ms)]`
+`.\go-portScan.exe -ip 1.1.1.1/30 [-port str] [-nP] [-sT] [-sV] [-rate num] [-rateP num] [-timeout num(ms)]`
 
 ```
  .\go-portScan.exe -h
-Usage of D:\pc\sync\projects\Porject\go-portScan\go-portScan.exe:
+Usage of go-portScan.exe:
   -ip string
         target ip, eg: "1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2"
   -nP
         no ping probe
   -port string
-        eg: "top1000,5612,65120" (default "top1000")
+        eg: "top1000,5612,65120,1-100" (default "top1000")
   -rate int
-        number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 2000(SYN-mode is restricted by the network adapter) (default -1)
+        number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 20000(SYN-mode is restricted by the network adapter, 2000=1M) (default -1)
   -rateP int
         concurrent num when ping probe each ip (default 300)
   -sT

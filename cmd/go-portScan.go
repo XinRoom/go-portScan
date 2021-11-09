@@ -35,7 +35,7 @@ func parseFlag() {
 	flag.IntVar(&rateP, "rateP", 300, "concurrent num when ping probe each ip")
 	flag.BoolVar(&sT, "sT", false, "TCP-mode(support IPv4 and IPv6); Use SYN-mode(Only IPv4) if not set")
 	flag.BoolVar(&sV, "sV", false, "port service identify")
-	flag.IntVar(&rate, "rate", -1, fmt.Sprintf("number of packets sent per second. If set -1, TCP-mode is %d, SYN-mode is %d(SYN-mode is restricted by the network adapter)", port.DefaultTcpOption.Rate, syn.DefaultSynOption.Rate))
+	flag.IntVar(&rate, "rate", -1, fmt.Sprintf("number of packets sent per second. If set -1, TCP-mode is %d, SYN-mode is %d(SYN-mode is restricted by the network adapter, 2000=1M)", port.DefaultTcpOption.Rate, syn.DefaultSynOption.Rate))
 	flag.IntVar(&timeout, "timeout", -1, "TCP-mode timeout. unit is ms. If set -1, 800ms.")
 	flag.Parse()
 }

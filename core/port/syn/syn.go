@@ -15,7 +15,7 @@ import (
 )
 
 var DefaultSynOption = port.Option{
-	Rate:    2000,
+	Rate:    20000,
 	Timeout: 0,
 }
 
