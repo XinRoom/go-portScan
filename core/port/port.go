@@ -176,6 +176,9 @@ func ShuffleParseAndMergeTopPorts(portStr string) (ports []uint16, err error) {
 			}
 			selectPort[_port] = struct{}{}
 			ports = append(ports, _port)
+			if _port == 65535 {
+				break
+			}
 		}
 	}
 	if len(ports) == 0 {
