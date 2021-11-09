@@ -75,9 +75,7 @@ func (w *watchIpStatusTable) HasIp(ip string) (has bool) {
 // IsEmpty 判断目前表是否为空
 func (w *watchIpStatusTable) IsEmpty() (empty bool) {
 	w.lock.RLock()
-	if len(w.watchIpS) == 0 {
-		empty = true
-	}
+	empty = len(w.watchIpS) == 0
 	w.lock.RUnlock()
 	return
 }
@@ -88,7 +86,9 @@ func (w *watchIpStatusTable) Close() {
 
 // 清理过期数据
 func (w *watchIpStatusTable) cleanTimeout() {
+	var needDel map[string]struct{}
 	for {
+		needDel = make(map[string]struct{})
 		if w.isDone {
 			break
 		}
@@ -96,11 +96,16 @@ func (w *watchIpStatusTable) cleanTimeout() {
 		w.lock.RLock()
 		for k, v := range w.watchIpS {
 			if time.Since(v.LastTime) > 5*time.Second {
+				needDel[k] = struct{}{}
+			}
+		}
+		w.lock.RUnlock()
+		if len(needDel) > 0 {
+			for k := range needDel {
 				w.lock.Lock()
 				delete(w.watchIpS, k)
 				w.lock.Unlock()
 			}
 		}
-		w.lock.RUnlock()
 	}
 }

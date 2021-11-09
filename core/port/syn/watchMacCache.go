@@ -77,9 +77,7 @@ func (w *watchMacCacheTable) IsNeedWatch(ip string) (has bool) {
 // IsEmpty 判断目前表是否为空
 func (w *watchMacCacheTable) IsEmpty() (empty bool) {
 	w.lock.RLock()
-	if len(w.watchMacC) == 0 {
-		empty = true
-	}
+	empty = len(w.watchMacC) == 0
 	w.lock.RUnlock()
 	return
 }
@@ -90,7 +88,9 @@ func (w *watchMacCacheTable) Close() {
 
 // 清理过期数据
 func (w *watchMacCacheTable) cleanTimeout() {
+	var needDel map[string]struct{}
 	for {
+		needDel = make(map[string]struct{})
 		if w.isDone {
 			break
 		}
@@ -98,11 +98,16 @@ func (w *watchMacCacheTable) cleanTimeout() {
 		w.lock.RLock()
 		for k, v := range w.watchMacC {
 			if time.Since(v.LastTime) > 20*time.Second {
+				needDel[k] = struct{}{}
+			}
+		}
+		w.lock.RUnlock()
+		if len(needDel) > 0 {
+			for k := range needDel {
 				w.lock.Lock()
 				delete(w.watchMacC, k)
 				w.lock.Unlock()
 			}
 		}
-		w.lock.RUnlock()
 	}
 }
