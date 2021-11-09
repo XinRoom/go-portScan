@@ -196,6 +196,12 @@ func (ss *synScanner) WaitLimiter() error {
 
 // getHwAddrV4 get the destination hardware address for our packets.
 func (ss *synScanner) getHwAddrV4(arpDst net.IP) (mac net.HardwareAddr, err error) {
+	ipStr := arpDst.String()
+	if ss.watchMacCacheT.IsNeedWatch(ipStr) {
+		return nil, errors.New("arp of this ip has been in monitoring")
+	}
+	ss.watchMacCacheT.UpdateLastTime(ipStr) // New one ip watch
+
 	// Prepare the layers to send for an ARP request.
 	eth := layers.Ethernet{
 		SrcMAC:       ss.srcMac,
@@ -214,29 +220,30 @@ func (ss *synScanner) getHwAddrV4(arpDst net.IP) (mac net.HardwareAddr, err erro
 		DstProtAddress:    []byte(arpDst),
 	}
 
-	ipStr := arpDst.String()
+	if err = ss.send(&eth, &arp); err != nil {
+		return nil, err
+	}
+
 	start := time.Now()
 	var retry int
 
 	for {
-		ss.watchMacCacheT.UpdateLastTime(ipStr) // New one ip watch
 		mac = ss.watchMacCacheT.GetMac(ipStr)
 		if mac != nil {
 			return mac, nil
 		}
+		// Wait 600 ms for an ARP reply.
+		if time.Since(start) > time.Millisecond*600 {
+			return nil, errors.New("timeout getting ARP reply")
+		}
+		retry += 1
 		if retry%25 == 0 {
 			if err = ss.send(&eth, &arp); err != nil {
 				return nil, err
 			}
 		}
 
-		retry += 1
-
-		// Wait 3 seconds for an ARP reply.
-		if time.Since(start) > time.Second*3 {
-			return nil, errors.New("timeout getting ARP reply")
-		}
-		time.Sleep(time.Millisecond * 20)
+		time.Sleep(time.Millisecond * 10)
 	}
 }
 
@@ -304,15 +311,15 @@ func (ss *synScanner) recv() {
 			continue
 		}
 
-		// Decode TCP Packet
-		err = parser.DecodeLayers(data, &foundLayerTypes)
-		if err != nil {
-			continue
-		}
-
 		// is done
 		if ss.isDone {
 			return
+		}
+
+		// Decode TCP or ARP Packet
+		err = parser.DecodeLayers(data, &foundLayerTypes)
+		if len(foundLayerTypes) == 0 {
+			continue
 		}
 
 		// arp
@@ -321,12 +328,12 @@ func (ss *synScanner) recv() {
 			if ss.watchMacCacheT.IsNeedWatch(ipStr) {
 				ss.watchMacCacheT.SetMac(ipStr, arpLayer.SourceHwAddress)
 			}
-			arpLayer.SourceProtAddress = nil
+			arpLayer.SourceProtAddress = nil // clean arp parse status
 			continue
 		}
 
 		// tcp Match ip and port
-		if tcpLayer.DstPort >= 49000 && tcpLayer.DstPort <= 54000 {
+		if tcpLayer.DstPort != 0 && tcpLayer.DstPort >= 49000 && tcpLayer.DstPort <= 54000 {
 			ipStr = ipLayer.SrcIP.String()
 			_port = uint16(tcpLayer.SrcPort)
 			if !ss.watchIpStatusT.HasIp(ipStr) { // IP
@@ -354,6 +361,7 @@ func (ss *synScanner) recv() {
 				tcp.SetNetworkLayerForChecksum(&ip4)
 				ss.send(&eth, &ip4, &tcp)
 			}
+			tcpLayer.DstPort = 0 // clean tcp parse status
 		}
 	}
 }
