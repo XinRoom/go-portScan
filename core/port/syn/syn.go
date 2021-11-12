@@ -15,7 +15,7 @@ import (
 )
 
 var DefaultSynOption = port.Option{
-	Rate:    20000,
+	Rate:    2000,
 	Timeout: 0,
 }
 
@@ -74,7 +74,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 			},
 		},
 		retChan:        retChan,
-		limiter:        limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), option.Rate),
+		limiter:        limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), 10),
 		ctx:            context.Background(),
 		watchIpStatusT: newWatchIpStatusTable(),
 		watchMacCacheT: newWatchMacCacheTable(),

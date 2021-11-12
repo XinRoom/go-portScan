@@ -132,7 +132,7 @@ func main() {
 	var wgPing sync.WaitGroup
 
 	// Pool - port scan
-	size := 0
+	size := option.Rate
 	if !sT {
 		// syn-mode Concurrency is not recommended !!!
 		// The default nic is sent at the maximum rate

@@ -10,7 +10,7 @@ import (
 )
 
 var DefaultTcpOption = Option{
-	Rate:    1000,
+	Rate:    2000,
 	Timeout: 800,
 }
 
@@ -37,7 +37,7 @@ func NewTcpScanner(retChan chan OpenIpPort, option Option) (ts *tcpScanner, err 
 
 	ts = &tcpScanner{
 		retChan: retChan,
-		limiter: limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), option.Rate),
+		limiter: limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), 10),
 		ctx:     context.Background(),
 		timeout: time.Duration(option.Timeout) * time.Millisecond,
 	}
