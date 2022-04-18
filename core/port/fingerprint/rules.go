@@ -10,7 +10,7 @@ import "regexp"
 var serviceOrder = []string{"http", "https"}
 
 var portServiceOrder = map[uint16][]string{
-	21:    {"21"},
+	21:    {"ftp"},
 	22:    {"ssh"},
 	80:    {"http", "https"},
 	443:   {"https", "http"},
@@ -144,25 +144,25 @@ func init() {
 		},
 	}
 
-	// tls
-	serviceRules["tls"] = serviceRule{
-		Tls: false,
-		DataGroup: []ruleData{
-			{
-				ActionSend,
-				[]byte("\x16\x03\x00\x00S\x01\x00\x00O\x03\x00?G\xd7\xf7\xba,\xee\xea\xb2`~\xf3\x00\xfd\x82{\xb9\xd5\x96\xc8w\x9b\xe6\xc4\xdb<=\xdbo\xef\x10n\x00\x00(\x00\x16\x00\x13\x00\x0a\x00f\x00\x05\x00\x04\x00e\x00d\x00c\x00b\x00a\x00`\x00\x15\x00\x12\x00\x09\x00\x14\x00\x11\x00\x08\x00\x06\x00\x03\x01\x00"),
-				nil,
-			},
-			{
-				ActionRecv,
-				nil,
-				[]*regexp.Regexp{
-					regexp.MustCompile(`^[\x16\x15]\x03\x00`),
-					regexp.MustCompile(`^[\x16\x15]\x03...\x02`),
-				},
-			},
-		},
-	}
+	//// tls
+	//serviceRules["tls"] = serviceRule{
+	//	Tls: false,
+	//	DataGroup: []ruleData{
+	//		{
+	//			ActionSend,
+	//			[]byte("\x16\x03\x00\x00S\x01\x00\x00O\x03\x00?G\xd7\xf7\xba,\xee\xea\xb2`~\xf3\x00\xfd\x82{\xb9\xd5\x96\xc8w\x9b\xe6\xc4\xdb<=\xdbo\xef\x10n\x00\x00(\x00\x16\x00\x13\x00\x0a\x00f\x00\x05\x00\x04\x00e\x00d\x00c\x00b\x00a\x00`\x00\x15\x00\x12\x00\x09\x00\x14\x00\x11\x00\x08\x00\x06\x00\x03\x01\x00"),
+	//			nil,
+	//		},
+	//		{
+	//			ActionRecv,
+	//			nil,
+	//			[]*regexp.Regexp{
+	//				regexp.MustCompile(`^[\x16\x15]\x03\x00`),
+	//				regexp.MustCompile(`^[\x16\x15]\x03...\x02`),
+	//			},
+	//		},
+	//	},
+	//}
 
 	// Db
 	// mysql

@@ -7,6 +7,7 @@ import (
 	"net"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -30,9 +31,102 @@ type serviceRule struct {
 }
 
 var serviceRules = make(map[string]serviceRule)
+var readBufPool = &sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 4096)
+	},
+}
 
 // PortIdentify 端口识别
 func PortIdentify(network string, ip net.IP, _port uint16) string {
+
+	// 指纹匹配函数
+	var err error
+	var isTls bool
+	var conn net.Conn
+	var connTls *tls.Conn
+	matchRule := func(network string, ip net.IP, _port uint16, serviceRule serviceRule) bool {
+
+		address := fmt.Sprintf("%s:%d", ip, _port)
+
+		// 建立连接
+		if serviceRule.Tls {
+			// tls
+			connTls, err = tls.DialWithDialer(&net.Dialer{Timeout: 2 * time.Second}, network, address, &tls.Config{
+				InsecureSkipVerify: true,
+			})
+			if err != nil || connTls == nil {
+				return false
+			}
+			defer connTls.Close()
+			isTls = true
+		} else {
+			conn, err = net.DialTimeout(network, address, time.Second*2)
+			if err != nil || conn == nil {
+				return false
+			}
+			defer conn.Close()
+		}
+
+		buf := readBufPool.Get().([]byte)
+		defer func() {
+			readBufPool.Put(buf)
+		}()
+
+		// 读函数
+		read := func() (int, error) {
+			if isTls {
+				connTls.SetReadDeadline(time.Now().Add(time.Second))
+				return connTls.Read(buf[:])
+			} else {
+				conn.SetReadDeadline(time.Now().Add(time.Second))
+				return conn.Read(buf[:])
+			}
+		}
+
+		data := []byte("")
+		// 逐个判断
+		for _, rule := range serviceRule.DataGroup {
+			if rule.Data != nil {
+				data = rule.Data
+			}
+			data = bytes.Replace(rule.Data, []byte("{IP}"), []byte(ip.String()), -1)
+			data = bytes.Replace(data, []byte("{PORT}"), []byte(strconv.Itoa(int(_port))), -1)
+			if rule.Action == ActionSend {
+				if isTls {
+					connTls.SetWriteDeadline(time.Now().Add(time.Second))
+					_, err = connTls.Write(data)
+				} else {
+					conn.SetWriteDeadline(time.Now().Add(time.Second))
+					_, err = conn.Write(data)
+				}
+				if err != nil {
+					// 出错就退出
+					return false
+				}
+			} else {
+				var n int
+				n, err = read()
+				// 出错就退出
+				if err != nil || n == 0 {
+					return false
+				}
+				// 包含数据就正确
+				if rule.Regexps != nil {
+					for _, _regex := range rule.Regexps {
+						if _regex.Match(buf[:n]) {
+							return true
+						}
+					}
+				}
+				if bytes.Compare(data, []byte("")) != 0 && bytes.Contains(buf[:n], data) {
+					return true
+				}
+			}
+		}
+
+		return false
+	}
 
 	matchedRule := make(map[string]struct{})
 
@@ -70,88 +164,4 @@ func PortIdentify(network string, ip net.IP, _port uint16) string {
 	}
 
 	return "unknown"
-}
-
-// 匹配规则
-func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule) bool {
-	var err error
-	var isTls bool
-	var conn net.Conn
-	var connTls *tls.Conn
-	address := fmt.Sprintf("%s:%d", ip, _port)
-
-	// 建立连接
-	if serviceRule.Tls {
-		// tls
-		connTls, err = tls.DialWithDialer(&net.Dialer{Timeout: 2 * time.Second}, network, address, &tls.Config{
-			InsecureSkipVerify: true,
-		})
-		if err != nil || connTls == nil {
-			return false
-		}
-		defer connTls.Close()
-		isTls = true
-	} else {
-		conn, err = net.DialTimeout(network, address, time.Second*2)
-		if err != nil || conn == nil {
-			return false
-		}
-		defer conn.Close()
-	}
-
-	buf := make([]byte, 4096)
-
-	// 读函数
-	read := func() (int, error) {
-		if isTls {
-			connTls.SetReadDeadline(time.Now().Add(time.Second))
-			return connTls.Read(buf[:])
-		} else {
-			conn.SetReadDeadline(time.Now().Add(time.Second))
-			return conn.Read(buf[:])
-		}
-	}
-
-	data := []byte("")
-	// 逐个判断
-	for _, rule := range serviceRule.DataGroup {
-		if rule.Data != nil {
-			data = rule.Data
-		}
-		data = bytes.Replace(rule.Data, []byte("{IP}"), []byte(ip.String()), -1)
-		data = bytes.Replace(data, []byte("{PORT}"), []byte(strconv.Itoa(int(_port))), -1)
-		if rule.Action == ActionSend {
-			if isTls {
-				connTls.SetWriteDeadline(time.Now().Add(time.Second))
-				_, err = connTls.Write(data)
-			} else {
-				conn.SetWriteDeadline(time.Now().Add(time.Second))
-				_, err = conn.Write(data)
-			}
-			if err != nil {
-				// 出错就退出
-				return false
-			}
-		} else {
-			var n int
-			n, err = read()
-			// 出错就退出
-			if err != nil || n == 0 {
-				return false
-			}
-			// 包含数据就正确
-			if rule.Regexps != nil {
-				for _, _regex := range rule.Regexps {
-					if _regex.Match(buf[:n]) {
-						return true
-					}
-				}
-			}
-			if bytes.Compare(data, []byte("")) != 0 && bytes.Contains(buf[:n], data) {
-				return true
-			}
-		}
-	}
-
-	return false
 }
