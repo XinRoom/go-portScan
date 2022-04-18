@@ -3,6 +3,7 @@ package syn
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/XinRoom/go-portScan/core/port"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -57,6 +58,13 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 	if err != nil {
 		return
 	}
+	if devName == "" && option.Dev == "" {
+		err = errors.New("get router info fail: no dev name")
+		return
+	}
+	if devName == "" {
+		devName = option.Dev
+	}
 
 	rand.Seed(time.Now().Unix())
 
@@ -86,8 +94,8 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 	if err != nil {
 		return
 	}
-	// Set filter
-	handle.SetBPFFilter("tcp || arp")
+	// Set filter, Reduce the number of monitoring packets
+	handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp)", srcMac.String()))
 	ss.handle = handle
 
 	// start listen recv
@@ -148,7 +156,8 @@ func (ss *synScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 		SrcIP:    ss.srcIp,
 		DstIP:    dstIp,
 		Version:  4,
-		TTL:      64,
+		TTL:      128,
+		Id:       uint16(50000 + rand.Intn(500)),
 		Flags:    layers.IPv4DontFragment,
 		Protocol: layers.IPProtocolTCP,
 	}
@@ -156,12 +165,31 @@ func (ss *synScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 		SrcPort: layers.TCPPort(49000 + rand.Intn(5000)), // Random source port and used to determine recv dst port range
 		DstPort: layers.TCPPort(dst),
 		SYN:     true,
-		Window:  65535,
+		Window:  65280,
+		Seq:     uint32(500000 + rand.Intn(5000)),
 		Options: []layers.TCPOption{
 			{
 				OptionType:   layers.TCPOptionKindMSS,
 				OptionLength: 4,
-				OptionData:   []byte{0x05, 0x84}, // 1412
+				OptionData:   []byte{0x05, 0x50}, // 1360
+			},
+			{
+				OptionType: layers.TCPOptionKindNop,
+			},
+			{
+				OptionType:   layers.TCPOptionKindWindowScale,
+				OptionLength: 3,
+				OptionData:   []byte{0x08},
+			},
+			{
+				OptionType: layers.TCPOptionKindNop,
+			},
+			{
+				OptionType: layers.TCPOptionKindNop,
+			},
+			{
+				OptionType:   layers.TCPOptionKindSACKPermitted,
+				OptionLength: 2,
 			},
 		},
 	}
@@ -192,6 +220,11 @@ func (ss *synScanner) Close() {
 // WaitLimiter Waiting for the speed limit
 func (ss *synScanner) WaitLimiter() error {
 	return ss.limiter.Wait(ss.ctx)
+}
+
+// GetDevName Get the device name after the route selection
+func (ss synScanner) GetDevName() string {
+	return ss.devName
 }
 
 // getHwAddrV4 get the destination hardware address for our packets.
