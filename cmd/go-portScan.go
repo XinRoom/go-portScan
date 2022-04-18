@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"github.com/XinRoom/go-portScan/core/host"
@@ -9,7 +10,9 @@ import (
 	"github.com/XinRoom/go-portScan/core/port/syn"
 	"github.com/XinRoom/go-portScan/util"
 	"github.com/XinRoom/iprange"
+	"github.com/google/gopacket/pcap"
 	"github.com/panjf2000/ants/v2"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -20,21 +23,27 @@ import (
 var (
 	ipStr   string
 	portStr string
-	nP      bool
+	Pn      bool
 	sT      bool
 	rate    int
 	sV      bool
 	timeout int
 	rateP   int
+	iL      string
+	devices bool
+	dev     string
 )
 
 func parseFlag() {
 	flag.StringVar(&ipStr, "ip", "", "target ip, eg: \"1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2\"")
+	flag.StringVar(&iL, "iL", "", "target ip file, eg: \"ips.txt\"")
 	flag.StringVar(&portStr, "port", "top1000", "eg: \"top1000,5612,65120\"")
-	flag.BoolVar(&nP, "nP", false, "no ping probe")
+	flag.StringVar(&dev, "dev", "", "specified pcap dev name")
+	flag.BoolVar(&Pn, "Pn", false, "no ping probe")
 	flag.IntVar(&rateP, "rateP", 300, "concurrent num when ping probe each ip")
 	flag.BoolVar(&sT, "sT", false, "TCP-mode(support IPv4 and IPv6); Use SYN-mode(Only IPv4) if not set")
 	flag.BoolVar(&sV, "sV", false, "port service identify")
+	flag.BoolVar(&devices, "devices", false, "list devices name")
 	flag.IntVar(&rate, "rate", -1, fmt.Sprintf("number of packets sent per second. If set -1, TCP-mode is %d, SYN-mode is %d(SYN-mode is restricted by the network adapter, 2000=1M)", port.DefaultTcpOption.Rate, syn.DefaultSynOption.Rate))
 	flag.IntVar(&timeout, "timeout", -1, "TCP-mode timeout. unit is ms. If set -1, 800ms.")
 	flag.Parse()
@@ -42,14 +51,45 @@ func parseFlag() {
 
 func main() {
 	parseFlag()
-	if ipStr == "" {
+	if devices {
+		pcapDevices, err := pcap.FindAllDevs()
+		if err != nil {
+			log.Fatalf("list pcapDevices failed: %s", err.Error())
+		}
+		for _, dev := range pcapDevices {
+			fmt.Println(dev.Name, "\t", dev.Description)
+		}
+		os.Exit(0)
+	}
+	if ipStr == "" && iL == "" {
 		flag.PrintDefaults()
 		os.Exit(0)
+	}
+	if portStr == "-" {
+		portStr = "1-65535"
 	}
 	ipRangeGroup := make([]*iprange.Iter, 0)
 	// ip parse
 	var firstIp net.IP
-	ips := strings.Split(ipStr, ",")
+	var ips []string
+	if ipStr != "" {
+		ips = strings.Split(ipStr, ",")
+	}
+	if iL != "" {
+		file, err := os.Open(iL)
+		if err != nil {
+			log.Fatalf("open file failed: %s", err.Error())
+		}
+		scanner := bufio.NewScanner(file)
+		var line string
+		for scanner.Scan() {
+			line = strings.TrimSpace(scanner.Text())
+			if line != "" {
+				ips = append(ips, line)
+			}
+		}
+		file.Close()
+	}
 	for _, _ip := range ips {
 		it, startIp, err := iprange.NewIter(_ip)
 		if err != nil {
@@ -105,6 +145,7 @@ func main() {
 	option := port.Option{
 		Rate:    rate,
 		Timeout: timeout,
+		Dev:     dev,
 	}
 	if sT {
 		// tcp
@@ -173,7 +214,7 @@ func main() {
 		for i := uint64(0); i < ir.TotalNum(); i++ { // ip index
 			ip := make(net.IP, len(ir.GetIpByIndex(0)))
 			copy(ip, ir.GetIpByIndex(shuffle.Get(i))) // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
-			if !nP {                                  // ping
+			if !Pn {                                  // ping
 				wgPing.Add(1)
 				_ = poolPing.Invoke(ip)
 			} else {

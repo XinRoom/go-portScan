@@ -102,8 +102,9 @@ type OpenIpPort struct {
 
 // Option ...
 type Option struct {
-	Rate    int // 每秒速度限制, 单位: s, 会在1s内平均发送, 相当于每个包之间的延迟
-	Timeout int // TCP连接响应延迟, 单位: ms
+	Rate    int    // 每秒速度限制, 单位: s, 会在1s内平均发送, 相当于每个包之间的延迟
+	Timeout int    // TCP连接响应延迟, 单位: ms
+	Dev     string // pcap dev name
 }
 
 // ParsePortRangeStr 解析端口字符串
