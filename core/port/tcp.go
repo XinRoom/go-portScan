@@ -10,7 +10,7 @@ import (
 )
 
 var DefaultTcpOption = Option{
-	Rate:    2000,
+	Rate:    1000,
 	Timeout: 800,
 }
 
@@ -50,13 +50,13 @@ func (ts *tcpScanner) Scan(ip net.IP, dst uint16) error {
 	if ts.isDone {
 		return errors.New("scanner is closed")
 	}
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, dst), ts.timeout)
-	if err == nil && conn != nil {
+	conn, _ := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, dst), ts.timeout)
+	if conn != nil {
+		conn.Close()
 		ts.retChan <- OpenIpPort{
 			Ip:   ip,
 			Port: dst,
 		}
-		conn.Close()
 	}
 	return nil
 }
