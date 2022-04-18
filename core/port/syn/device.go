@@ -1,9 +1,12 @@
 package syn
 
 import (
+	"errors"
 	"fmt"
 	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/routing"
 	"github.com/jackpal/gateway"
+	"github.com/libp2p/go-netroute"
 	"net"
 )
 
@@ -21,7 +24,7 @@ func GetDevByIp(ip net.IP) (devName string, err error) {
 			}
 		}
 	}
-	return
+	return "", errors.New("can not find dev")
 }
 
 // GetIfaceMac get interface mac addr by interface ip (use golang net)
@@ -44,16 +47,31 @@ func GetRouterV4(dst net.IP) (srcIp net.IP, srcMac net.HardwareAddr, gw net.IP, 
 	// 同网段
 	srcIp, srcMac = GetIfaceMac(dst)
 	if srcIp == nil {
-		// 取第一个默认路由
-		gw, err = gateway.DiscoverGateway()
-		gw = gw.To4()
+		var r routing.Router
+		r, err = netroute.New()
 		if err == nil {
-			srcIp, srcMac = GetIfaceMac(gw)
+			var iface *net.Interface
+			iface, gw, srcIp, err = r.Route(dst)
+			if err == nil {
+				if iface != nil {
+					srcMac = iface.HardwareAddr
+				} else {
+					_, srcMac = GetIfaceMac(srcIp)
+				}
+			}
+		}
+		if err != nil {
+			// 取第一个默认路由
+			gw, err = gateway.DiscoverGateway()
+			if err == nil {
+				srcIp, srcMac = GetIfaceMac(gw)
+			}
 		}
 	}
+	gw = gw.To4()
 	srcIp = srcIp.To4()
-	devName, err = GetDevByIp(srcIp)
-	if srcIp == nil || err != nil {
+	devName, _ = GetDevByIp(srcIp)
+	if srcIp == nil || err != nil || srcMac == nil {
 		return nil, nil, nil, "", fmt.Errorf("no router, %s", err)
 	}
 	return
