@@ -9,12 +9,15 @@ require (
 	github.com/jackpal/gateway v1.0.7
 	github.com/libp2p/go-netroute v0.2.0
 	github.com/panjf2000/ants/v2 v2.4.8
+	github.com/urfave/cli/v2 v2.5.0
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306
 )
 
 require (
+	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	golang.org/x/net v0.0.0-20220412020605-290c469a71a5 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
+	golang.org/x/sys v0.0.0-20220422013727-9388b58f7150 // indirect
 )
