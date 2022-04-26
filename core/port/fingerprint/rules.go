@@ -7,7 +7,9 @@ import "regexp"
 
 // Available variables: {PORT},{IP}
 
-var serviceOrder = []string{"http", "https"}
+var serviceOrder = []string{"http", "https", "ssh", "redis", "mysql"}
+
+var onlyRecv []string
 
 var portServiceOrder = map[uint16][]string{
 	21:    {"ftp"},
@@ -260,5 +262,12 @@ func init() {
 				},
 			},
 		},
+	}
+
+	// onlyRecv
+	for k, m := range serviceRules {
+		if len(m.DataGroup) == 1 {
+			onlyRecv = append(onlyRecv, k)
+		}
 	}
 }
