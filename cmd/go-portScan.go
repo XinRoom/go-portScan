@@ -12,6 +12,7 @@ import (
 	"github.com/XinRoom/iprange"
 	"github.com/google/gopacket/pcap"
 	"github.com/panjf2000/ants/v2"
+	"github.com/urfave/cli/v2"
 	"log"
 	"net"
 	"os"
@@ -23,7 +24,7 @@ import (
 var (
 	ipStr   string
 	portStr string
-	Pn      bool
+	pn      bool
 	sT      bool
 	rate    int
 	sV      bool
@@ -34,30 +35,29 @@ var (
 	dev     string
 )
 
-func parseFlag() {
-	flag.StringVar(&ipStr, "ip", "", "target ip, eg: \"1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2\"")
-	flag.StringVar(&iL, "iL", "", "target ip file, eg: \"ips.txt\"")
-	flag.StringVar(&portStr, "port", "top1000", "eg: \"top1000,5612,65120\"")
-	flag.StringVar(&dev, "dev", "", "specified pcap dev name")
-	flag.BoolVar(&Pn, "Pn", false, "no ping probe")
-	flag.IntVar(&rateP, "rateP", 300, "concurrent num when ping probe each ip")
-	flag.BoolVar(&sT, "sT", false, "TCP-mode(support IPv4 and IPv6); Use SYN-mode(Only IPv4) if not set")
-	flag.BoolVar(&sV, "sV", false, "port service identify")
-	flag.BoolVar(&devices, "devices", false, "list devices name")
-	flag.IntVar(&rate, "rate", -1, fmt.Sprintf("number of packets sent per second. If set -1, TCP-mode is %d, SYN-mode is %d(SYN-mode is restricted by the network adapter, 2000=1M)", port.DefaultTcpOption.Rate, syn.DefaultSynOption.Rate))
-	flag.IntVar(&timeout, "timeout", -1, "TCP-mode timeout. unit is ms. If set -1, 800ms.")
-	flag.Parse()
+func parseFlag(c *cli.Context) {
+	ipStr = c.String("ip")
+	iL = c.String("iL")
+	portStr = c.String("port")
+	dev = c.String("dev")
+	devices = c.Bool("devices")
+	pn = c.Bool("Pn")
+	rateP = c.Int("rateP")
+	rate = c.Int("rate")
+	sT = c.Bool("sT")
+	sV = c.Bool("sV")
+	timeout = c.Int("timeout")
 }
 
-func main() {
-	parseFlag()
+func run(c *cli.Context) error {
+	parseFlag(c)
 	if devices {
 		pcapDevices, err := pcap.FindAllDevs()
 		if err != nil {
 			log.Fatalf("list pcapDevices failed: %s", err.Error())
 		}
 		for _, dev := range pcapDevices {
-			fmt.Println(dev.Name, "\t", dev.Description)
+			fmt.Println("Dev:", dev.Name, "\tDes:", dev.Description)
 		}
 		os.Exit(0)
 	}
@@ -214,7 +214,7 @@ func main() {
 		for i := uint64(0); i < ir.TotalNum(); i++ { // ip index
 			ip := make(net.IP, len(ir.GetIpByIndex(0)))
 			copy(ip, ir.GetIpByIndex(shuffle.Get(i))) // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
-			if !Pn {                                  // ping
+			if !pn {                                  // ping
 				wgPing.Add(1)
 				_ = poolPing.Invoke(ip)
 			} else {
@@ -228,4 +228,87 @@ func main() {
 	<-single              // 接收器-收
 	wgPortIdentify.Wait() // 识别器-收
 	fmt.Printf("[*] const time: %s\n", time.Since(start))
+	return nil
+}
+
+func main() {
+	app := &cli.App{
+		Name:        "PortScan",
+		Description: "High-performance port scanner",
+		Action:      run,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "ip",
+				Usage:    "target ip, eg: \"1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2\"",
+				Required: true,
+				Value:    "",
+			},
+			&cli.StringFlag{
+				Name:     "iL",
+				Usage:    "target ip file, eg: \"ips.txt\"",
+				Required: false,
+				Value:    "",
+			},
+			&cli.StringFlag{
+				Name:    "port",
+				Aliases: []string{"p"},
+				Usage:   "eg: \"top1000,5612,65120\"",
+				Value:   "top1000",
+			},
+			&cli.BoolFlag{
+				Name:  "Pn",
+				Usage: "no ping probe",
+				Value: false,
+			},
+			&cli.IntFlag{
+				Name:    "rateP",
+				Aliases: []string{"rp"},
+				Usage:   "concurrent num when ping probe each ip",
+				Value:   300,
+			},
+			&cli.BoolFlag{
+				Name:  "sT",
+				Usage: "TCP-mode(support IPv4 and IPv6)",
+				Value: false,
+			},
+			&cli.IntFlag{
+				Name:    "timeout",
+				Aliases: []string{"to"},
+				Usage:   "TCP-mode timeout. unit is ms. If set -1, 800ms.",
+				Value:   -1,
+			},
+			&cli.BoolFlag{
+				Name:  "sS",
+				Usage: "Use SYN-mode(Only IPv4)",
+				Value: true,
+			},
+			&cli.StringFlag{
+				Name:  "dev",
+				Usage: "specified pcap dev name",
+				Value: "",
+			},
+			&cli.IntFlag{
+				Name:    "rate",
+				Aliases: []string{"r"},
+				Usage:   fmt.Sprintf("number of packets sent per second. If set -1, TCP-mode is %d, SYN-mode is %d(SYN-mode is restricted by the network adapter, 2000=1M)", port.DefaultTcpOption.Rate, syn.DefaultSynOption.Rate),
+				Value:   -1,
+			},
+			&cli.BoolFlag{
+				Name:    "devices",
+				Aliases: []string{"ld"},
+				Usage:   "list devices name",
+				Value:   false,
+			},
+			&cli.BoolFlag{
+				Name:  "sV",
+				Usage: "port service identify",
+				Value: false,
+			},
+		},
+	}
+
+	err := app.Run(os.Args)
+	if err != nil {
+		fmt.Println("err:", err)
+	}
 }
