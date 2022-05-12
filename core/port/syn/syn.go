@@ -17,7 +17,7 @@ import (
 
 var DefaultSynOption = port.Option{
 	Rate:    2000,
-	Timeout: 0,
+	Timeout: 800,
 }
 
 type synScanner struct {
@@ -84,7 +84,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 		retChan:        retChan,
 		limiter:        limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), 10),
 		ctx:            context.Background(),
-		watchIpStatusT: newWatchIpStatusTable(),
+		watchIpStatusT: newWatchIpStatusTable(time.Duration(option.Timeout)),
 		watchMacCacheT: newWatchMacCacheTable(),
 	}
 
@@ -201,20 +201,30 @@ func (ss *synScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 	return
 }
 
+func (ss *synScanner) Wait() {
+	// Delay 2s for a reply from the last packet
+	for i := 0; i < 20; i++ {
+		if ss.watchIpStatusT.IsEmpty() {
+			return
+		}
+		time.Sleep(time.Millisecond * 100)
+	}
+}
+
 // Close cleans up the handle and chan.
 func (ss *synScanner) Close() {
-	// Delay 2s for a reply from the last packet
-	time.Sleep(time.Millisecond * 100)
-	if !ss.watchIpStatusT.IsEmpty() {
-		time.Sleep(time.Second * 2)
-	}
 	ss.isDone = true
-	ss.handle.Close()
-	ss.watchMacCacheT.Close()
-	ss.watchIpStatusT.Close()
+	if ss.handle != nil {
+		ss.handle.Close()
+	}
+	if ss.watchMacCacheT != nil {
+		ss.watchMacCacheT.Close()
+	}
+	if ss.watchIpStatusT != nil {
+		ss.watchIpStatusT.Close()
+	}
 	ss.watchMacCacheT = nil
 	ss.watchIpStatusT = nil
-	close(ss.retChan)
 }
 
 // WaitLimiter Waiting for the speed limit

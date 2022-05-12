@@ -46,6 +46,14 @@ func PingOk(host string) bool {
 		if strings.Contains(out.String(), "TTL=") {
 			return true
 		}
+	case "darwin":
+		cmd := exec.Command("ping", "-c", "1", "-t", "1", host)
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Run()
+		if strings.Contains(out.String(), "ttl=") {
+			return true
+		}
 	}
 	return false
 }

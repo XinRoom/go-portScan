@@ -161,6 +161,9 @@ func run(c *cli.Context) error {
 		if option.Rate == -1 {
 			option.Rate = syn.DefaultSynOption.Rate
 		}
+		if option.Timeout == -1 {
+			option.Timeout = syn.DefaultSynOption.Timeout
+		}
 		s, err = syn.NewSynScanner(firstIp, retChan, option)
 	}
 	if err != nil {
@@ -224,10 +227,11 @@ func run(c *cli.Context) error {
 	}
 	wgScan.Wait()         // 扫描器-发
 	wgPing.Wait()         // PING组
+	s.Wait()              // 扫描器-等
 	s.Close()             // 扫描器-收
 	<-single              // 接收器-收
 	wgPortIdentify.Wait() // 识别器-收
-	fmt.Printf("[*] const time: %s\n", time.Since(start))
+	fmt.Printf("[*] elapsed time: %s\n", time.Since(start))
 	return nil
 }
 
@@ -274,8 +278,8 @@ func main() {
 			&cli.IntFlag{
 				Name:    "timeout",
 				Aliases: []string{"to"},
-				Usage:   "TCP-mode timeout. unit is ms. If set -1, 800ms.",
-				Value:   -1,
+				Usage:   "TCP-mode SYN-mode timeout. unit is ms.",
+				Value:   800,
 			},
 			&cli.BoolFlag{
 				Name:  "sS",

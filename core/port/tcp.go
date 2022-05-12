@@ -61,10 +61,12 @@ func (ts *tcpScanner) Scan(ip net.IP, dst uint16) error {
 	return nil
 }
 
+func (ts *tcpScanner) Wait() {
+}
+
 // Close chan
 func (ts *tcpScanner) Close() {
 	ts.isDone = true
-	close(ts.retChan)
 }
 
 // WaitLimiter Waiting for the speed limit

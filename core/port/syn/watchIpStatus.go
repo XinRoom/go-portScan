@@ -17,11 +17,11 @@ type watchIpStatusTable struct {
 	isDone   bool
 }
 
-func newWatchIpStatusTable() (w *watchIpStatusTable) {
+func newWatchIpStatusTable(timeout time.Duration) (w *watchIpStatusTable) {
 	w = &watchIpStatusTable{
 		watchIpS: make(map[string]*watchIpStatus),
 	}
-	go w.cleanTimeout()
+	go w.cleanTimeout(timeout)
 	return
 }
 
@@ -85,17 +85,17 @@ func (w *watchIpStatusTable) Close() {
 }
 
 // 清理过期数据
-func (w *watchIpStatusTable) cleanTimeout() {
+func (w *watchIpStatusTable) cleanTimeout(timeout time.Duration) {
 	var needDel map[string]struct{}
 	for {
 		needDel = make(map[string]struct{})
 		if w.isDone {
 			break
 		}
-		time.Sleep(3 * time.Second)
+		time.Sleep(time.Second)
 		w.lock.RLock()
 		for k, v := range w.watchIpS {
-			if time.Since(v.LastTime) > 5*time.Second {
+			if time.Since(v.LastTime) > timeout*time.Millisecond {
 				needDel[k] = struct{}{}
 			}
 		}

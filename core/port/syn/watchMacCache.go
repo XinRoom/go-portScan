@@ -94,10 +94,10 @@ func (w *watchMacCacheTable) cleanTimeout() {
 		if w.isDone {
 			break
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second)
 		w.lock.RLock()
 		for k, v := range w.watchMacC {
-			if time.Since(v.LastTime) > 20*time.Second {
+			if time.Since(v.LastTime) > 10*time.Second {
 				needDel[k] = struct{}{}
 			}
 		}

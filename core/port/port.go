@@ -90,6 +90,7 @@ var TopTcpPorts = []uint16{
 
 type Scanner interface {
 	Close()
+	Wait()
 	Scan(ip net.IP, dst uint16) error
 	WaitLimiter() error
 }
