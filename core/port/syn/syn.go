@@ -62,7 +62,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 		err = errors.New("get router info fail: no dev name")
 		return
 	}
-	if devName == "" {
+	if option.Dev != "" {
 		devName = option.Dev
 	}
 
