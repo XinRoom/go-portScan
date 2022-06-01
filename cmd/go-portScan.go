@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"github.com/XinRoom/go-portScan/core/host"
 	"github.com/XinRoom/go-portScan/core/port"
@@ -50,6 +49,9 @@ func parseFlag(c *cli.Context) {
 }
 
 func run(c *cli.Context) error {
+	if c.NumFlags() == 0 {
+		cli.ShowAppHelpAndExit(c, 0)
+	}
 	parseFlag(c)
 	if devices {
 		pcapDevices, err := pcap.FindAllDevs()
@@ -62,8 +64,7 @@ func run(c *cli.Context) error {
 		os.Exit(0)
 	}
 	if ipStr == "" && iL == "" {
-		flag.PrintDefaults()
-		os.Exit(0)
+		cli.ShowAppHelpAndExit(c, 0)
 	}
 	if portStr == "-" {
 		portStr = "1-65535"
@@ -245,7 +246,7 @@ func main() {
 			&cli.StringFlag{
 				Name:     "ip",
 				Usage:    "target ip, eg: \"1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2\"",
-				Required: true,
+				Required: false,
 				Value:    "",
 			},
 			&cli.StringFlag{
