@@ -55,3 +55,12 @@ func (sf *Shuffle) Get(index uint64) uint64 {
 	}
 	return index - t + uint64(sf.rl[uint16(t)])
 }
+
+func IsUint16InList(code uint16, list []uint16) bool {
+	for _, e := range list {
+		if e == code {
+			return true
+		}
+	}
+	return false
+}

@@ -32,6 +32,7 @@ var (
 	iL      string
 	devices bool
 	dev     string
+	httpx   bool
 )
 
 func parseFlag(c *cli.Context) {
@@ -46,6 +47,7 @@ func parseFlag(c *cli.Context) {
 	sT = c.Bool("sT")
 	sV = c.Bool("sV")
 	timeout = c.Int("timeout")
+	httpx = c.Bool("httpx")
 }
 
 func run(c *cli.Context) error {
@@ -113,10 +115,32 @@ func run(c *cli.Context) error {
 	single := make(chan struct{})
 	retChan := make(chan port.OpenIpPort, 65535)
 	// port fingerprint
+	var httpxFile *os.File
+	var httpxFileLooker sync.Mutex
+	if httpx {
+		httpxFile, err = os.OpenFile("httpInfo.txt", os.O_APPEND|os.O_CREATE, 0644)
+		if err == nil {
+			defer httpxFile.Close()
+		}
+	}
 	var wgPortIdentify sync.WaitGroup
 	poolPortIdentify, _ := ants.NewPoolWithFunc(500, func(ipPort interface{}) {
 		ret := ipPort.(port.OpenIpPort)
-		fmt.Printf("%s:%d %s\n", ret.Ip, ret.Port, fingerprint.PortIdentify("tcp", ret.Ip, ret.Port))
+		if httpx {
+			_buf := fingerprint.ProbeHttpInfo(ret.Ip, ret.Port)
+			if _buf != nil {
+				buf := fmt.Sprintf("[HttpInfo]%s\n", _buf)
+				if httpxFile != nil {
+					httpxFileLooker.Lock()
+					httpxFile.WriteString(buf)
+					httpxFileLooker.Unlock()
+				}
+				fmt.Print(buf)
+			}
+		} else {
+			fmt.Printf("%s:%d %s\n", ret.Ip, ret.Port, fingerprint.PortIdentify("tcp", ret.Ip, ret.Port))
+		}
+
 		wgPortIdentify.Done()
 	})
 	defer poolPortIdentify.Release()
@@ -128,11 +152,12 @@ func run(c *cli.Context) error {
 					single <- struct{}{}
 					return
 				}
-				if sV {
+				if sV || httpx {
 					// port fingerprint
 					wgPortIdentify.Add(1)
 					poolPortIdentify.Invoke(ret)
-				} else {
+				}
+				if !sV {
 					fmt.Printf("%v:%d\n", ret.Ip, ret.Port)
 				}
 			default:
@@ -308,6 +333,11 @@ func main() {
 			&cli.BoolFlag{
 				Name:  "sV",
 				Usage: "port service identify",
+				Value: false,
+			},
+			&cli.BoolFlag{
+				Name:  "httpx",
+				Usage: "http server identify",
 				Value: false,
 			},
 		},
