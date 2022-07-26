@@ -15,6 +15,7 @@ type HttpInfo struct {
 	Url        string   // Url
 	Location   string   // 302、301重定向路径
 	Title      string   // 标题
+	Server     string   // 服务名
 	TlsCN      string   // tls使用者名称
 	TlsDNS     []string // tlsDNS列表
 }
@@ -37,6 +38,9 @@ func (hi *HttpInfo) String() string {
 	}
 	if len(hi.TlsDNS) > 0 {
 		buf.WriteString("TlsDNS:" + strings.Join(hi.TlsDNS, ",") + " ")
+	}
+	if hi.Server != "" {
+		buf.WriteString("Server:" + hi.Server + " ")
 	}
 	return buf.String()
 }
@@ -95,6 +99,7 @@ func ProbeHttpInfo(ip net.IP, _port uint16) *HttpInfo {
 			httpInfo.StatusCode = resp.StatusCode
 			httpInfo.ContentLen = int(resp.ContentLength)
 			httpInfo.Location = rewriteUrl
+			httpInfo.Server = resp.Header.Get("Server")
 			httpInfo.Title = ExtractTitle(body)
 			if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
 				httpInfo.TlsCN = resp.TLS.PeerCertificates[0].Subject.CommonName
