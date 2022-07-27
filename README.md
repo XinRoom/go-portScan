@@ -15,6 +15,7 @@ High-performance port scanner.
 - Concurrent high performance (by ants)
 - TCP scan
 - Port Fingerprint Identification
+- HTTP Service Detection
 
 ## Use as a library
 
@@ -168,26 +169,34 @@ go build cmd/go-portScan.go
 
 ## Cmd Usage
 
-`.\go-portScan.exe -ip 1.1.1.1/30 [-port str] [-nP] [-sT] [-sV] [-rate num] [-rateP num] [-timeout num(ms)]`
+`.\go-portScan.exe -ip 1.1.1.1/30 [-p str] [-Pn] [-sT] [-sV] [-rate num] [-rateP num] [-timeout num(ms)]`
 
 ```
- .\go-portScan.exe -h
-Usage of go-portScan.exe:
-  -ip string
-        target ip, eg: "1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2"
-  -nP
-        no ping probe
-  -port string
-        eg: "top1000,5612,65120,1-100" (default "top1000")
-  -rate int
-        number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 20000(SYN-mode is restricted by the network adapter, 2000=1M) (default -1)
-  -rateP int
-        concurrent num when ping probe each ip (default 300)
-  -sT
-        TCP-mode(support IPv4 and IPv6); Use SYN-mode(Only IPv4) if not set
-  -sV
-        port service identify
-  -timeout int
-        TCP-mode timeout. unit is ms. If set -1, 800ms. (default -1)
+ NAME:
+   PortScan - A new cli application
 
+USAGE:
+   PortScan [global options] command [command options] [arguments...]
+
+DESCRIPTION:
+   High-performance port scanner
+
+COMMANDS:
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --ip value                   target ip, eg: "1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2"
+   --iL value                   target ip file, eg: "ips.txt"
+   --port value, -p value       eg: "top1000,5612,65120" (default: "top1000")
+   --Pn                         no ping probe (default: false)
+   --rateP value, --rp value    concurrent num when ping probe each ip (default: 300)
+   --sT                         TCP-mode(support IPv4 and IPv6) (default: false)
+   --timeout value, --to value  TCP-mode SYN-mode timeout. unit is ms. (default: 800)
+   --sS                         Use SYN-mode(Only IPv4) (default: true)
+   --dev value                  specified pcap dev name
+   --rate value, -r value       number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 2000(SYN-mode is restricted by the network adapter, 2000=1M) (default: -1)  
+   --devices, --ld              list devices name (default: false)
+   --sV                         port service identify (default: false)
+   --httpx                      http server identify (default: false)
+   --help, -h                   show help (default: false)
 ```

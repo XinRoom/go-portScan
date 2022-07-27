@@ -29,7 +29,7 @@ func (hi *HttpInfo) String() string {
 		return ""
 	}
 	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("Url:%s StatusCode:%d ContentLen:%d Title:%s ", hi.Url, hi.StatusCode, hi.ContentLen, hi.Title))
+	buf.WriteString(fmt.Sprintf("%s StatusCode:%d ContentLen:%d Title:%s ", hi.Url, hi.StatusCode, hi.ContentLen, hi.Title))
 	if hi.Location != "" {
 		buf.WriteString("Location:" + hi.Location + " ")
 	}
@@ -105,7 +105,9 @@ func ProbeHttpInfo(ip net.IP, _port uint16) *HttpInfo {
 				httpInfo.TlsCN = resp.TLS.PeerCertificates[0].Subject.CommonName
 				httpInfo.TlsDNS = resp.TLS.PeerCertificates[0].DNSNames
 			}
-			break
+			if resp.StatusCode != 400 {
+				break
+			}
 		}
 	}
 
