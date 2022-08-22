@@ -137,7 +137,8 @@ func run(c *cli.Context) error {
 				}
 				fmt.Print(buf)
 			}
-		} else {
+		}
+		if sV {
 			fmt.Printf("%s:%d %s\n", ret.Ip, ret.Port, fingerprint.PortIdentify("tcp", ret.Ip, ret.Port))
 		}
 
@@ -255,7 +256,7 @@ func run(c *cli.Context) error {
 	wgPing.Wait() // PING组
 	s.Wait()      // 扫描器-等
 	s.Close()     // 扫描器-收
-	close(retChan)
+	//close(retChan)
 	<-single              // 接收器-收
 	wgPortIdentify.Wait() // 识别器-收
 	fmt.Printf("[*] elapsed time: %s\n", time.Since(start))
@@ -283,7 +284,7 @@ func main() {
 			&cli.StringFlag{
 				Name:    "port",
 				Aliases: []string{"p"},
-				Usage:   "eg: \"top1000,5612,65120\"",
+				Usage:   "eg: \"top1000,5612,65120,-\"",
 				Value:   "top1000",
 			},
 			&cli.BoolFlag{
