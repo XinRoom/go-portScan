@@ -112,7 +112,8 @@ func run(c *cli.Context) error {
 	}
 
 	// recv
-	single := make(chan struct{})
+	single1 := make(chan struct{})
+	single2 := make(chan struct{})
 	retChan := make(chan port.OpenIpPort, 65535)
 	// port fingerprint
 	var httpxFile *os.File
@@ -133,6 +134,7 @@ func run(c *cli.Context) error {
 				if httpxFile != nil {
 					httpxFileLooker.Lock()
 					httpxFile.WriteString(buf)
+					httpxFile.Sync()
 					httpxFileLooker.Unlock()
 				}
 				fmt.Print(buf)
@@ -148,11 +150,10 @@ func run(c *cli.Context) error {
 	go func() {
 		for {
 			select {
+			case <-single1:
+				single2 <- struct{}{}
+				return
 			case ret := <-retChan:
-				if ret.Port == 0 {
-					single <- struct{}{}
-					return
-				}
 				if sV || httpx {
 					// port fingerprint
 					wgPortIdentify.Add(1)
@@ -252,12 +253,12 @@ func run(c *cli.Context) error {
 			}
 		}
 	}
-	wgScan.Wait() // 扫描器-发
-	wgPing.Wait() // PING组
-	s.Wait()      // 扫描器-等
-	s.Close()     // 扫描器-收
-	//close(retChan)
-	<-single              // 接收器-收
+	wgScan.Wait()         // 扫描器-发
+	wgPing.Wait()         // PING组
+	s.Wait()              // 扫描器-等
+	s.Close()             // 扫描器-收
+	single1 <- struct{}{} // 告知接收器没有新端口输出了
+	<-single2             // 接收器-收
 	wgPortIdentify.Wait() // 识别器-收
 	fmt.Printf("[*] elapsed time: %s\n", time.Since(start))
 	return nil
