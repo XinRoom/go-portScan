@@ -45,7 +45,13 @@ func newHttpClient() *http.Client {
 		Timeout:   3 * time.Second,
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse /* 不进入重定向 */
+			if len(via) >= 2 {
+				return errors.New("stopped after 2 redirects")
+			}
+			if len(via) > 0 && via[len(via)-1].Response != nil && via[len(via)-1].Response.StatusCode != 301 {
+				return errors.New("only redirect 301")
+			}
+			return nil
 		},
 	}
 }

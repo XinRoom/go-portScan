@@ -119,7 +119,7 @@ func run(c *cli.Context) error {
 	var httpxFile *os.File
 	var httpxFileLooker sync.Mutex
 	if httpx {
-		httpxFile, err = os.OpenFile("httpInfo.txt", os.O_APPEND|os.O_CREATE, 0644)
+		httpxFile, err = os.OpenFile("httpInfo.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 		if err == nil {
 			defer httpxFile.Close()
 		}
