@@ -148,11 +148,11 @@ func run(c *cli.Context) error {
 	})
 	defer poolPortIdentify.Release()
 	go func() {
+		sendOverFlag := false
 		for {
 			select {
 			case <-single1:
-				single2 <- struct{}{}
-				return
+				sendOverFlag = true
 			case ret := <-retChan:
 				if sV || httpx {
 					// port fingerprint
@@ -163,6 +163,10 @@ func run(c *cli.Context) error {
 					fmt.Printf("%v:%d\n", ret.Ip, ret.Port)
 				}
 			default:
+				if sendOverFlag {
+					single2 <- struct{}{}
+					return
+				}
 				time.Sleep(time.Millisecond * 10)
 			}
 		}
