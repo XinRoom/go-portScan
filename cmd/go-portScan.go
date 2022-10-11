@@ -13,6 +13,7 @@ import (
 	"github.com/panjf2000/ants/v2"
 	"github.com/urfave/cli/v2"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -33,6 +34,7 @@ var (
 	devices bool
 	dev     string
 	httpx   bool
+	netLive bool
 )
 
 func parseFlag(c *cli.Context) {
@@ -48,6 +50,7 @@ func parseFlag(c *cli.Context) {
 	sV = c.Bool("sV")
 	timeout = c.Int("timeout")
 	httpx = c.Bool("httpx")
+	netLive = c.Bool("netLive")
 }
 
 func run(c *cli.Context) error {
@@ -104,6 +107,43 @@ func run(c *cli.Context) error {
 		}
 		ipRangeGroup = append(ipRangeGroup, it)
 	}
+
+	// netLive
+	var wgIpsLive sync.WaitGroup
+	// Pool - ipsLive
+	poolIpsLive, _ := ants.NewPoolWithFunc(rateP, func(ip interface{}) {
+		_ip := ip.([]net.IP)
+		for _, ip2 := range _ip {
+			if host.IsLive(ip2.String()) {
+				fmt.Printf("[+] %s is live\n", ip2.String())
+				break
+			}
+		}
+		wgIpsLive.Done()
+	})
+	defer poolIpsLive.Release()
+
+	if netLive {
+		// 按c段探测
+		for _, ir := range ipRangeGroup { // ip group
+			for i := uint64(0); i < ir.TotalNum(); i = i + 256 { // ip index
+				ip := make(net.IP, len(ir.GetIpByIndex(0)))
+				copy(ip, ir.GetIpByIndex(i)) // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
+				ipLastByte := []byte{1, 2, 254, 253, byte(100 + rand.Intn(20)), byte(200 + rand.Intn(20))}
+				ips2 := make([]net.IP, 6)
+				for j := 0; j < 6; j++ {
+					ips2[j] = make(net.IP, len(ip))
+					ip[3] = ipLastByte[j]
+					copy(ips2[j], ip)
+				}
+				wgIpsLive.Add(1)
+				poolIpsLive.Invoke(ips2)
+			}
+		}
+		wgIpsLive.Wait()
+		return nil
+	}
+
 	// port parse
 	ports, err := port.ShuffleParseAndMergeTopPorts(portStr)
 	if err != nil {
@@ -344,6 +384,11 @@ func main() {
 			&cli.BoolFlag{
 				Name:  "httpx",
 				Usage: "http server identify",
+				Value: false,
+			},
+			&cli.BoolFlag{
+				Name:  "netLive",
+				Usage: "Detect live C-class networks, eg: -ip 192.168.0.0/16,172.16.0.0/12,10.0.0.0/8",
 				Value: false,
 			},
 		},

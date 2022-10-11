@@ -172,7 +172,7 @@ go build cmd/go-portScan.go
 `.\go-portScan.exe -ip 1.1.1.1/30 [-p str] [-Pn] [-sT] [-sV] [-rate num] [-rateP num] [-timeout num(ms)]`
 
 ```
- NAME:
+NAME:
    PortScan - A new cli application
 
 USAGE:
@@ -187,16 +187,17 @@ COMMANDS:
 GLOBAL OPTIONS:
    --ip value                   target ip, eg: "1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2"
    --iL value                   target ip file, eg: "ips.txt"
-   --port value, -p value       eg: "top1000,5612,65120" (default: "top1000")
+   --port value, -p value       eg: "top1000,5612,65120,-" (default: "top1000")
    --Pn                         no ping probe (default: false)
    --rateP value, --rp value    concurrent num when ping probe each ip (default: 300)
    --sT                         TCP-mode(support IPv4 and IPv6) (default: false)
    --timeout value, --to value  TCP-mode SYN-mode timeout. unit is ms. (default: 800)
    --sS                         Use SYN-mode(Only IPv4) (default: true)
    --dev value                  specified pcap dev name
-   --rate value, -r value       number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 2000(SYN-mode is restricted by the network adapter, 2000=1M) (default: -1)  
+   --rate value, -r value       number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 2000(SYN-mode is restricted by the network adapter, 2000=1M) (default: -1)
    --devices, --ld              list devices name (default: false)
    --sV                         port service identify (default: false)
    --httpx                      http server identify (default: false)
+   --netLive                    Detect live C-class networks, eg: -ip 192.168.0.0/16,172.16.0.0/12,10.0.0.0/8 (default: false)
    --help, -h                   show help (default: false)
 ```
