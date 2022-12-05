@@ -263,7 +263,7 @@ func (ss *synScanner) getHwAddrV4(arpDst net.IP) (mac net.HardwareAddr, err erro
 		DstProtAddress:    []byte(arpDst),
 	}
 
-	if err = ss.send(&eth, &arp); err != nil {
+	if err = ss.sendArp(&eth, &arp); err != nil {
 		return nil, err
 	}
 
@@ -301,6 +301,19 @@ func (ss *synScanner) send(l ...gopacket.SerializableLayer) error {
 		return err
 	}
 	return ss.handle.WritePacketData(buf.Bytes())
+}
+
+// send sends the given layers as a single packet on the network., need fix padding
+func (ss *synScanner) sendArp(l ...gopacket.SerializableLayer) error {
+	buf := ss.bufPool.Get().(gopacket.SerializeBuffer)
+	defer func() {
+		buf.Clear()
+		ss.bufPool.Put(buf)
+	}()
+	if err := gopacket.SerializeLayers(buf, ss.opts, l...); err != nil {
+		return err
+	}
+	return ss.handle.WritePacketData(buf.Bytes()[:42]) // need fix padding
 }
 
 // recv packet on the network.
