@@ -16,6 +16,7 @@ var portServiceOrder = map[uint16][]string{
 	22:    {"ssh"},
 	80:    {"http", "https"},
 	443:   {"https", "http"},
+	445:   {"smb"},
 	1035:  {"oracle"},
 	1080:  {"socks5", "socks4"},
 	1081:  {"socks5", "socks4"},
@@ -165,6 +166,25 @@ func init() {
 	//		},
 	//	},
 	//}
+
+	// smb
+	serviceRules["smb"] = serviceRule{
+		Tls: false,
+		DataGroup: []ruleData{
+			{
+				ActionSend,
+				[]byte(`\x00\x00\x00\xa4\xff\x53\x4d\x42\x72\x00\x00\x00\x00\x08\x01\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x06\x00\x00\x01\x00\x00\x81\x00\x02PC NETWORK PROGRAM 1.0\x00\x02MICROSOFT NETWORKS 1.03\x00\x02MICROSOFT NETWORKS 3.0\x00\x02LANMAN1.0\x00\x02LM1.2X002\x00\x02Samba\x00\x02NT LANMAN 1.0\x00\x02NT LM 0.12\x00`),
+				nil,
+			},
+			{
+				ActionRecv,
+				nil,
+				[]*regexp.Regexp{
+					regexp.MustCompile(`^\x00\x00\x00.\xffSMBr\x00\x00\x00\x00\x88\x01@`),
+				},
+			},
+		},
+	}
 
 	// Db
 	// mysql
