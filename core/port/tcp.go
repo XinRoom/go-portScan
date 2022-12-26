@@ -67,6 +67,7 @@ func (ts *tcpScanner) Wait() {
 // Close chan
 func (ts *tcpScanner) Close() {
 	ts.isDone = true
+	ts.retChan <- OpenIpPort{}
 }
 
 // WaitLimiter Waiting for the speed limit

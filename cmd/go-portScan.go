@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/XinRoom/go-portScan/core/host"
 	"github.com/XinRoom/go-portScan/core/port"
@@ -9,7 +8,6 @@ import (
 	"github.com/XinRoom/go-portScan/core/port/syn"
 	"github.com/XinRoom/go-portScan/util"
 	"github.com/XinRoom/iprange"
-	"github.com/google/gopacket/pcap"
 	"github.com/panjf2000/ants/v2"
 	"github.com/urfave/cli/v2"
 	"log"
@@ -22,19 +20,24 @@ import (
 )
 
 var (
-	ipStr   string
-	portStr string
-	pn      bool
-	sT      bool
-	rate    int
-	sV      bool
-	timeout int
-	rateP   int
-	iL      string
-	devices bool
-	dev     string
-	httpx   bool
-	netLive bool
+	ipStr     string
+	portStr   string
+	pn        bool
+	sT        bool
+	rate      int
+	sV        bool
+	timeout   int
+	rateP     int
+	iL        string
+	devices   bool
+	dev       string
+	httpx     bool
+	netLive   bool
+	bp        bool
+	user      string
+	passwd    string
+	service   string
+	threadNum int
 )
 
 func parseFlag(c *cli.Context) {
@@ -59,12 +62,10 @@ func run(c *cli.Context) error {
 	}
 	parseFlag(c)
 	if devices {
-		pcapDevices, err := pcap.FindAllDevs()
-		if err != nil {
-			log.Fatalf("list pcapDevices failed: %s", err.Error())
-		}
-		for _, dev := range pcapDevices {
-			fmt.Println("Dev:", dev.Name, "\tDes:", dev.Description)
+		if r, err := syn.GetAllDevs(); err != nil {
+			log.Fatal(err.Error())
+		} else {
+			fmt.Print(r)
 		}
 		os.Exit(0)
 	}
@@ -82,19 +83,11 @@ func run(c *cli.Context) error {
 		ips = strings.Split(ipStr, ",")
 	}
 	if iL != "" {
-		file, err := os.Open(iL)
+		var err error
+		ips, err = util.GetLines(iL)
 		if err != nil {
 			log.Fatalf("open file failed: %s", err.Error())
 		}
-		scanner := bufio.NewScanner(file)
-		var line string
-		for scanner.Scan() {
-			line = strings.TrimSpace(scanner.Text())
-			if line != "" {
-				ips = append(ips, line)
-			}
-		}
-		file.Close()
 	}
 	for _, _ip := range ips {
 		it, startIp, err := iprange.NewIter(_ip)
@@ -152,8 +145,7 @@ func run(c *cli.Context) error {
 	}
 
 	// recv
-	single1 := make(chan struct{})
-	single2 := make(chan struct{})
+	single := make(chan struct{})
 	retChan := make(chan port.OpenIpPort, 65535)
 	// port fingerprint
 	var httpxFile *os.File
@@ -188,12 +180,13 @@ func run(c *cli.Context) error {
 	})
 	defer poolPortIdentify.Release()
 	go func() {
-		sendOverFlag := false
 		for {
 			select {
-			case <-single1:
-				sendOverFlag = true
 			case ret := <-retChan:
+				if ret.Port == 0 {
+					single <- struct{}{}
+					return
+				}
 				if sV || httpx {
 					// port fingerprint
 					wgPortIdentify.Add(1)
@@ -203,10 +196,6 @@ func run(c *cli.Context) error {
 					fmt.Printf("%v:%d\n", ret.Ip, ret.Port)
 				}
 			default:
-				if sendOverFlag {
-					single2 <- struct{}{}
-					return
-				}
 				time.Sleep(time.Millisecond * 10)
 			}
 		}
@@ -297,12 +286,11 @@ func run(c *cli.Context) error {
 			}
 		}
 	}
-	wgScan.Wait()         // 扫描器-发
 	wgPing.Wait()         // PING组
+	wgScan.Wait()         // 扫描器-发
 	s.Wait()              // 扫描器-等
 	s.Close()             // 扫描器-收
-	single1 <- struct{}{} // 告知接收器没有新端口输出了
-	<-single2             // 接收器-收
+	<-single              // 接收器-收
 	wgPortIdentify.Wait() // 识别器-收
 	fmt.Printf("[*] elapsed time: %s\n", time.Since(start))
 	return nil

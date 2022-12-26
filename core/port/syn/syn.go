@@ -11,14 +11,10 @@ import (
 	limiter "golang.org/x/time/rate"
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
-
-var DefaultSynOption = port.Option{
-	Rate:    2000,
-	Timeout: 800,
-}
 
 type synScanner struct {
 	srcMac, gwMac net.HardwareAddr // macAddr
@@ -214,6 +210,7 @@ func (ss *synScanner) Wait() {
 // Close cleans up the handle and chan.
 func (ss *synScanner) Close() {
 	ss.isDone = true
+	ss.retChan <- port.OpenIpPort{}
 	if ss.handle != nil {
 		ss.handle.Close()
 	}
@@ -420,4 +417,16 @@ func (ss *synScanner) recv() {
 			tcpLayer.DstPort = 0 // clean tcp parse status
 		}
 	}
+}
+
+func GetAllDevs() (string, error) {
+	pcapDevices, err := pcap.FindAllDevs()
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("list pcapDevices failed: %s", err.Error()))
+	}
+	var buf strings.Builder
+	for _, dev := range pcapDevices {
+		buf.WriteString(fmt.Sprintln("Dev:", dev.Name, "\tDes:", dev.Description))
+	}
+	return buf.String(), nil
 }
