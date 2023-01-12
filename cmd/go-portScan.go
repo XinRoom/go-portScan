@@ -228,7 +228,7 @@ func run(c *cli.Context) error {
 		s, err = syn.NewSynScanner(firstIp, retChan, option)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[error] Initialize Scanner: %s", err)
+		fmt.Fprintf(os.Stderr, "[error] Initialize Scanner: %s\n", err)
 		os.Exit(-1)
 	}
 
