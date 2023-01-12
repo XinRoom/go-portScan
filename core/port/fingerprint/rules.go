@@ -89,6 +89,8 @@ func init() {
 				nil,
 				[]*regexp.Regexp{
 					regexp.MustCompile(`^220 ([-/.+\w]+) FTP server`),
+					regexp.MustCompile(`^220[ |-](.*?)FileZilla`),
+					regexp.MustCompile(`^(?i)220[ |-](.*?)version`),
 					regexp.MustCompile(`^220 3Com `),
 					regexp.MustCompile(`^220-GuildFTPd`),
 					regexp.MustCompile(`^220-.*\r\n220`),
@@ -96,7 +98,7 @@ func init() {
 					regexp.MustCompile(`^530 Connection refused,`),
 					regexp.MustCompile(`^220 IIS ([\w._-]+) FTP`),
 					regexp.MustCompile(`^220 PizzaSwitch `),
-					regexp.MustCompile(`^220 ([-.+\w]+) FTP`),
+					regexp.MustCompile(`(?i)^220 ([-.+\w]+) FTP`),
 					regexp.MustCompile(`(?i)^220[ |-](.*?)FTP`),
 				},
 			},
@@ -173,15 +175,39 @@ func init() {
 		DataGroup: []ruleData{
 			{
 				ActionSend,
-				[]byte(`\x00\x00\x00\xa4\xff\x53\x4d\x42\x72\x00\x00\x00\x00\x08\x01\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x06\x00\x00\x01\x00\x00\x81\x00\x02PC NETWORK PROGRAM 1.0\x00\x02MICROSOFT NETWORKS 1.03\x00\x02MICROSOFT NETWORKS 3.0\x00\x02LANMAN1.0\x00\x02LM1.2X002\x00\x02Samba\x00\x02NT LANMAN 1.0\x00\x02NT LM 0.12\x00`),
+				[]byte("\x00\x00\x00\xa4\xff\x53\x4d\x42\x72\x00\x00\x00\x00\x08\x01\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x06\x00\x00\x01\x00\x00\x81\x00\x02PC NETWORK PROGRAM 1.0\x00\x02MICROSOFT NETWORKS 1.03\x00\x02MICROSOFT NETWORKS 3.0\x00\x02LANMAN1.0\x00\x02LM1.2X002\x00\x02Samba\x00\x02NT LANMAN 1.0\x00\x02NT LM 0.12\x00"),
 				nil,
 			},
 			{
 				ActionRecv,
 				nil,
 				[]*regexp.Regexp{
-					regexp.MustCompile(`^\x00\x00\x00.\xffSMBr\x00\x00\x00\x00\x88\x01@`),
+					regexp.MustCompile(`MBr\x00\x00\x00\x00\x88\x01@\x00`),
 				},
+			},
+		},
+	}
+
+	// jdwp
+	serviceRules["jdwp"] = serviceRule{
+		Tls: false,
+		DataGroup: []ruleData{
+			{
+				ActionRecv,
+				[]byte("JDWP-Handshake"),
+				nil,
+			},
+		},
+	}
+
+	// jdbc
+	serviceRules["jdbc"] = serviceRule{
+		Tls: false,
+		DataGroup: []ruleData{
+			{
+				ActionRecv,
+				[]byte("HSQLDB JDBC Network Listener"),
+				nil,
 			},
 		},
 	}
@@ -275,7 +301,7 @@ func init() {
 				ActionRecv,
 				nil,
 				[]*regexp.Regexp{
-					regexp.MustCompile(`(?s)^.*version.....([.\d]+)`),
+					regexp.MustCompile(`(?s)^.*version([: "]+)([.\d]+)"`),
 					regexp.MustCompile(`(?s)^\xcb\x00\x00\x00....:0\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\xa7\x00\x00\x00\x01uptime\x00\x00\x00\x00\x00\x00 ` + "`" + `@\x03globalLock\x009\x00\x00\x00\x01totalTime\x00\x00\x00\x00\x7c\xf0\x9a\x9eA\x01lockTime\x00\x00\x00\x00\x00\x00\xac\x9e@\x01ratio\x00!\xc6\$G\xeb\x08\xf0>\x00\x03mem\x00<\x00\x00\x00\x10resident\x00\x03\x00\x00\x00\x10virtual\x00\xa2\x00\x00\x00\x08supported\x00\x01\x12mapped\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01ok\x00\x00\x00\x00\x00\x00\x00\xf0\?\x00$`),
 					regexp.MustCompile(`(?s)^.\x00\x00\x00....:0\x00\x00\x01\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\+\x00\x00\x00\x02errmsg\x00\x0e\x00\x00\x00need to login\x00\x01ok\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00`),
 					regexp.MustCompile(`(?s)^.\x00\x00\x00....:0\x00\x00\x01\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00.\x00\x00\x00\x01ok\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02errmsg\x00.\x00\x00\x00not authorized on`),
