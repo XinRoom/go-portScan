@@ -49,12 +49,24 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 		return
 	}
 
-	// get router info
-	srcIp, srcMac, gw, devName, err := GetRouterV4(firstIp)
+	var devName string
+	var srcIp net.IP
+	var srcMac net.HardwareAddr
+	var gw net.IP
+
+	// specify dev
+	if option.NextHop != "" {
+		gw = net.ParseIP(option.NextHop).To4()
+		srcIp, srcMac, devName, err = GetMacByGw(gw)
+	} else {
+		// get router info
+		srcIp, srcMac, gw, devName, err = GetRouterV4(firstIp)
+	}
 	if err != nil {
 		return
 	}
-	if devName == "" && option.Dev == "" {
+
+	if devName == "" {
 		err = errors.New("get router info fail: no dev name")
 		return
 	}

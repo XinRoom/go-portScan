@@ -44,6 +44,28 @@ func GetIfaceMac(ifaceAddr net.IP) (src net.IP, mac net.HardwareAddr) {
 	return nil, nil
 }
 
+// GetMacByGw get srcIp srcMac devname by gw
+func GetMacByGw(gw net.IP) (srcIp net.IP, srcMac net.HardwareAddr, devname string, err error) {
+	srcIp, srcMac = GetIfaceMac(gw)
+	if srcIp == nil {
+		err = errors.New("can not find this dev by gw")
+		return
+	}
+	srcIp = srcIp.To4()
+	devices, err := pcap.FindAllDevs()
+	if err != nil {
+		return
+	}
+	for _, d := range devices {
+		if len(d.Addresses) > 0 && d.Addresses[0].IP.String() == srcIp.String() {
+			devname = d.Name
+			return
+		}
+	}
+	err = errors.New("can not find this dev")
+	return
+}
+
 // GetRouterV4 get ipv6 router by dst ip
 func GetRouterV4(dst net.IP) (srcIp net.IP, srcMac net.HardwareAddr, gw net.IP, devName string, err error) {
 	// 同网段
@@ -74,6 +96,9 @@ func GetRouterV4(dst net.IP) (srcIp net.IP, srcMac net.HardwareAddr, gw net.IP, 
 	srcIp = srcIp.To4()
 	devName, _ = GetDevByIp(srcIp)
 	if srcIp == nil || err != nil || srcMac == nil {
+		if err == nil {
+			err = fmt.Errorf("err")
+		}
 		return nil, nil, nil, "", fmt.Errorf("no router, %s", err)
 	}
 	return

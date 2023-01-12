@@ -30,7 +30,7 @@ var (
 	rateP     int
 	iL        string
 	devices   bool
-	dev       string
+	nexthop   string
 	httpx     bool
 	netLive   bool
 	bp        bool
@@ -44,7 +44,7 @@ func parseFlag(c *cli.Context) {
 	ipStr = c.String("ip")
 	iL = c.String("iL")
 	portStr = c.String("port")
-	dev = c.String("dev")
+	nexthop = c.String("nexthop")
 	devices = c.Bool("devices")
 	pn = c.Bool("Pn")
 	rateP = c.Int("rateP")
@@ -206,7 +206,7 @@ func run(c *cli.Context) error {
 	option := port.Option{
 		Rate:    rate,
 		Timeout: timeout,
-		Dev:     dev,
+		NextHop: nexthop,
 	}
 	if sT {
 		// tcp
@@ -348,9 +348,10 @@ func main() {
 				Value: true,
 			},
 			&cli.StringFlag{
-				Name:  "dev",
-				Usage: "specified pcap dev name",
-				Value: "",
+				Name:    "nexthop",
+				Aliases: []string{"nh"},
+				Usage:   "specified nexthop gw add to pcap dev",
+				Value:   "",
 			},
 			&cli.IntFlag{
 				Name:    "rate",
