@@ -174,6 +174,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule)
 		// tls
 		connTls, err = tls.DialWithDialer(&net.Dialer{Timeout: 2 * time.Second}, network, address, &tls.Config{
 			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS10,
 		})
 		if err != nil {
 			if strings.HasSuffix(err.Error(), "i/o timeout") {

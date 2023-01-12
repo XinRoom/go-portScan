@@ -20,6 +20,7 @@ func newHttpClient() *http.Client {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS10,
 		},
 		DialContext: (&net.Dialer{
 			Timeout: 5 * time.Second,
