@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 type Action uint8
@@ -20,7 +21,6 @@ const (
 	ActionSend
 )
 
-//
 type ruleData struct {
 	Action  Action // send or recv
 	Data    []byte // send or match data
@@ -148,7 +148,7 @@ func matchRuleWhithBuf(buf, ip net.IP, _port uint16, serviceRule serviceRule) in
 		// 包含数据就正确
 		if rule.Regexps != nil {
 			for _, _regex := range rule.Regexps {
-				if _regex.Match(buf) {
+				if _regex.MatchString(convert2utf8(string(buf))) {
 					return 1
 				}
 			}
@@ -236,7 +236,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule)
 			// 包含数据就正确
 			if rule.Regexps != nil {
 				for _, _regex := range rule.Regexps {
-					if _regex.Match(buf[:n]) {
+					if _regex.MatchString(convert2utf8(string(buf[:n]))) {
 						return 1
 					}
 				}
@@ -260,4 +260,20 @@ func read(conn interface{}, buf []byte) (int, error) {
 		return conn.(*tls.Conn).Read(buf[:])
 	}
 	return 0, errors.New("unknown type")
+}
+
+// fix regexp only use utf-8, ref: https://paper.seebug.org/1679/
+func convert2utf8(src string) string {
+	var dst string
+	for i, r := range src {
+		var v string
+		if r == utf8.RuneError {
+			// convert, rune => string, intstring() => encoderune()
+			v = string(src[i])
+		} else {
+			v = string(r)
+		}
+		dst += v
+	}
+	return dst
 }
