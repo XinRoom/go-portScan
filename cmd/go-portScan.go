@@ -20,24 +20,25 @@ import (
 )
 
 var (
-	ipStr     string
-	portStr   string
-	pn        bool
-	sT        bool
-	rate      int
-	sV        bool
-	timeout   int
-	rateP     int
-	iL        string
-	devices   bool
-	nexthop   string
-	httpx     bool
-	netLive   bool
-	bp        bool
-	user      string
-	passwd    string
-	service   string
-	threadNum int
+	ipStr       string
+	portStr     string
+	pn          bool
+	sT          bool
+	rate        int
+	sV          bool
+	timeout     int
+	rateP       int
+	iL          string
+	devices     bool
+	nexthop     string
+	httpx       bool
+	netLive     bool
+	bp          bool
+	user        string
+	passwd      string
+	service     string
+	threadNum   int
+	maxOpenPort int
 )
 
 func parseFlag(c *cli.Context) {
@@ -54,6 +55,7 @@ func parseFlag(c *cli.Context) {
 	timeout = c.Int("timeout")
 	httpx = c.Bool("httpx")
 	netLive = c.Bool("netLive")
+	maxOpenPort = c.Int("maxOpenPort")
 }
 
 func run(c *cli.Context) error {
@@ -179,6 +181,11 @@ func run(c *cli.Context) error {
 		wgPortIdentify.Done()
 	})
 	defer poolPortIdentify.Release()
+
+	// ip port num status
+	ipPortNumMap := make(map[string]int) // 记录该IP端口开放数量
+	var ipPortNumRW sync.RWMutex
+
 	go func() {
 		for {
 			select {
@@ -186,6 +193,11 @@ func run(c *cli.Context) error {
 				if ret.Port == 0 {
 					single <- struct{}{}
 					return
+				}
+				if maxOpenPort > 0 {
+					ipPortNumRW.Lock()
+					ipPortNumMap[ret.Ip.String()] += 1
+					ipPortNumRW.Unlock()
 				}
 				if sV || httpx {
 					// port fingerprint
@@ -252,8 +264,20 @@ func run(c *cli.Context) error {
 
 	// port scan func
 	portScan := func(ip net.IP) {
+		var ipPortNum int
+		var ipPortNumOk bool
 		for _, _port := range ports { // port
 			s.WaitLimiter() // limit rate
+
+			if maxOpenPort > 0 {
+				ipPortNumRW.RLock()
+				ipPortNum, ipPortNumOk = ipPortNumMap[ip.String()]
+				ipPortNumRW.RUnlock()
+				if ipPortNumOk && ipPortNum >= maxOpenPort {
+					return
+				}
+			}
+
 			wgScan.Add(1)
 			_ = poolScan.Invoke(port.OpenIpPort{
 				Ip:   ip,
@@ -379,6 +403,11 @@ func main() {
 				Name:  "netLive",
 				Usage: "Detect live C-class networks, eg: -ip 192.168.0.0/16,172.16.0.0/12,10.0.0.0/8",
 				Value: false,
+			},
+			&cli.IntFlag{
+				Name:  "maxOpenPort",
+				Usage: "Stop the ip scan, when the number of open-port is maxOpenPort",
+				Value: 0,
 			},
 		},
 	}
