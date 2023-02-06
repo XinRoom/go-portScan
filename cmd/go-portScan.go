@@ -274,7 +274,7 @@ func run(c *cli.Context) error {
 				ipPortNum, ipPortNumOk = ipPortNumMap[ip.String()]
 				ipPortNumRW.RUnlock()
 				if ipPortNumOk && ipPortNum >= maxOpenPort {
-					return
+					break
 				}
 			}
 
@@ -283,6 +283,11 @@ func run(c *cli.Context) error {
 				Ip:   ip,
 				Port: _port,
 			})
+		}
+		if maxOpenPort > 0 {
+			ipPortNumRW.Lock()
+			delete(ipPortNumMap, ip.String())
+			ipPortNumRW.Unlock()
 		}
 	}
 
