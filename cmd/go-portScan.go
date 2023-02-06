@@ -196,7 +196,9 @@ func run(c *cli.Context) error {
 				}
 				if maxOpenPort > 0 {
 					ipPortNumRW.Lock()
-					ipPortNumMap[ret.Ip.String()] += 1
+					if _, ok := ipPortNumMap[ret.Ip.String()]; ok {
+						ipPortNumMap[ret.Ip.String()] += 1
+					}
 					ipPortNumRW.Unlock()
 				}
 				if sV || httpx {
@@ -266,6 +268,11 @@ func run(c *cli.Context) error {
 	portScan := func(ip net.IP) {
 		var ipPortNum int
 		var ipPortNumOk bool
+		if maxOpenPort > 0 {
+			ipPortNumRW.Lock()
+			ipPortNumMap[ip.String()] = 0
+			ipPortNumRW.Unlock()
+		}
 		for _, _port := range ports { // port
 			s.WaitLimiter() // limit rate
 
