@@ -10,7 +10,6 @@ import (
 	"github.com/XinRoom/iprange"
 	"github.com/panjf2000/ants/v2"
 	"github.com/urfave/cli/v2"
-	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -59,15 +58,16 @@ func parseFlag(c *cli.Context) {
 }
 
 func run(c *cli.Context) error {
+	myLog := util.NewLogger("output.log", true)
 	if c.NumFlags() == 0 {
 		cli.ShowAppHelpAndExit(c, 0)
 	}
 	parseFlag(c)
 	if devices {
 		if r, err := syn.GetAllDevs(); err != nil {
-			log.Fatal(err.Error())
+			myLog.Fatal(err.Error())
 		} else {
-			fmt.Print(r)
+			myLog.Print(r)
 		}
 		os.Exit(0)
 	}
@@ -88,14 +88,13 @@ func run(c *cli.Context) error {
 		var err error
 		ips, err = util.GetLines(iL)
 		if err != nil {
-			log.Fatalf("open file failed: %s", err.Error())
+			myLog.Fatalf("open file failed: %s", err.Error())
 		}
 	}
 	for _, _ip := range ips {
 		it, startIp, err := iprange.NewIter(_ip)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "[error] %s is not ip!\n", _ip)
-			os.Exit(-1)
+			myLog.Fatalf("[error] %s is not ip!\n", _ip)
 		}
 		if firstIp == nil {
 			firstIp = startIp
@@ -110,7 +109,7 @@ func run(c *cli.Context) error {
 		_ip := ip.([]net.IP)
 		for _, ip2 := range _ip {
 			if host.IsLive(ip2.String()) {
-				fmt.Printf("[+] %s is live\n", ip2.String())
+				myLog.Printf("[+] %s is live\n", ip2.String())
 				break
 			}
 		}
@@ -142,36 +141,20 @@ func run(c *cli.Context) error {
 	// port parse
 	ports, err := port.ShuffleParseAndMergeTopPorts(portStr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[error] %s is not port!", err)
-		os.Exit(-1)
+		myLog.Fatalf("[error] %s is not port!\n", err)
 	}
 
 	// recv
 	single := make(chan struct{})
 	retChan := make(chan port.OpenIpPort, 65535)
 	// port fingerprint
-	var httpxFile *os.File
-	var httpxFileLooker sync.Mutex
-	if httpx {
-		httpxFile, err = os.OpenFile("httpInfo.txt", os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
-		if err == nil {
-			defer httpxFile.Close()
-		}
-	}
 	var wgPortIdentify sync.WaitGroup
 	poolPortIdentify, _ := ants.NewPoolWithFunc(500, func(ipPort interface{}) {
 		ret := ipPort.(port.OpenIpPort)
 		if httpx {
 			_buf := fingerprint.ProbeHttpInfo(ret.Ip, ret.Port)
 			if _buf != nil {
-				buf := fmt.Sprintf("[HttpInfo]%s\n", _buf)
-				if httpxFile != nil {
-					httpxFileLooker.Lock()
-					httpxFile.WriteString(buf)
-					httpxFile.Sync()
-					httpxFileLooker.Unlock()
-				}
-				fmt.Print(buf)
+				myLog.Printf("[HttpInfo]%s\n", _buf)
 			}
 		}
 		if sV {
@@ -207,7 +190,7 @@ func run(c *cli.Context) error {
 					poolPortIdentify.Invoke(ret)
 				}
 				if !sV {
-					fmt.Printf("%v:%d\n", ret.Ip, ret.Port)
+					myLog.Printf("%v:%d\n", ret.Ip, ret.Port)
 				}
 			default:
 				time.Sleep(time.Millisecond * 10)
@@ -244,6 +227,7 @@ func run(c *cli.Context) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[error] Initialize Scanner: %s\n", err)
 		os.Exit(-1)
+		myLog.Fatalf("[error] Initialize Scanner: %s\n", err)
 	}
 
 	start := time.Now()
@@ -328,7 +312,7 @@ func run(c *cli.Context) error {
 	s.Close()             // 扫描器-收
 	<-single              // 接收器-收
 	wgPortIdentify.Wait() // 识别器-收
-	fmt.Printf("[*] elapsed time: %s\n", time.Since(start))
+	myLog.Printf("[*] elapsed time: %s\n", time.Since(start))
 	return nil
 }
 
