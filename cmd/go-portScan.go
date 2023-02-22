@@ -158,7 +158,7 @@ func run(c *cli.Context) error {
 			}
 		}
 		if sV {
-			fmt.Printf("%s:%d %s\n", ret.Ip, ret.Port, fingerprint.PortIdentify("tcp", ret.Ip, ret.Port))
+			myLog.Printf("%s:%d %s\n", ret.Ip, ret.Port, fingerprint.PortIdentify("tcp", ret.Ip, ret.Port))
 		}
 
 		wgPortIdentify.Done()
