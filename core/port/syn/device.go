@@ -84,7 +84,7 @@ func GetRouterV4(dst net.IP) (srcIp net.IP, srcMac net.HardwareAddr, gw net.IP, 
 				}
 			}
 		}
-		if err != nil {
+		if err != nil || srcMac == nil {
 			// 取第一个默认路由
 			gw, err = gateway.DiscoverGateway()
 			if err == nil {
