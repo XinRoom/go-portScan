@@ -169,7 +169,7 @@ go build cmd/go-portScan.go
 
 ## Cmd Usage
 
-`.\go-portScan.exe -ip 1.1.1.1/30 [-p str] [-Pn] [-sT] [-sV] [-rate num] [-rateP num] [-timeout num(ms)]`
+`.\go-portScan.exe -ip 1.1.1.1/30 [-p str] [-Pn] [-sT] [-sV] [-httpx] [-rate num] [-rateP num] [-timeout num(ms)]`
 
 ```
 NAME:
@@ -193,11 +193,26 @@ GLOBAL OPTIONS:
    --sT                         TCP-mode(support IPv4 and IPv6) (default: false)
    --timeout value, --to value  TCP-mode SYN-mode timeout. unit is ms. (default: 800)
    --sS                         Use SYN-mode(Only IPv4) (default: true)
-   --dev value                  specified pcap dev name
+   --nexthop value, --nh value  specified nexthop gw add to pcap dev
    --rate value, -r value       number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 2000(SYN-mode is restricted by the network adapter, 2000=1M) (default: -1)
    --devices, --ld              list devices name (default: false)
    --sV                         port service identify (default: false)
    --httpx                      http server identify (default: false)
    --netLive                    Detect live C-class networks, eg: -ip 192.168.0.0/16,172.16.0.0/12,10.0.0.0/8 (default: false)
+   --maxOpenPort value          Stop the ip scan, when the number of open-port is maxOpenPort (default: 0)
    --help, -h                   show help (default: false)
+```
+
+关键参数说明：
+
+```
+--Pn 在目标禁止PING是使用
+--rate 在网络不稳定时（互联网）可以适当减少（互联网下建议500~1500）
+--timeout 在网络不稳定时（互联网）可以适当增加
+--nexthop 用于在syn扫描模式下，路由网卡选择不对的情况，指定下一跳网关地址（需要是本地网卡上绑定的网关地址）
+
+--sV 用于判断端口的服务（主要是探测风险比较大的服务）
+--netLive 用于抽取网络内6个左右IP进行存活探测
+--httpx 用于探测http服务的title等信息
+--maxOpenPort 用于目标组内存在防扫描防火墙的情况，单个IP扫描到开放的端口到达该值就停止对该IP扫描，避免浪费时间（建议值500）
 ```
