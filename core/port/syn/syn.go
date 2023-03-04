@@ -11,7 +11,6 @@ import (
 	limiter "golang.org/x/time/rate"
 	"math/rand"
 	"net"
-	"strings"
 	"sync"
 	"time"
 )
@@ -426,16 +425,4 @@ func (ss *synScanner) recv() {
 			tcpLayer.DstPort = 0 // clean tcp parse status
 		}
 	}
-}
-
-func GetAllDevs() (string, error) {
-	pcapDevices, err := pcap.FindAllDevs()
-	if err != nil {
-		return "", errors.New(fmt.Sprintf("list pcapDevices failed: %s", err.Error()))
-	}
-	var buf strings.Builder
-	for _, dev := range pcapDevices {
-		buf.WriteString(fmt.Sprintln("Dev:", dev.Name, "\tDes:", dev.Description))
-	}
-	return buf.String(), nil
 }

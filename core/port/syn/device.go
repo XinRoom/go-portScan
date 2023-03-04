@@ -10,7 +10,24 @@ import (
 	"github.com/jackpal/gateway"
 	"github.com/libp2p/go-netroute"
 	"net"
+	"strings"
 )
+
+func GetAllDevs() (string, error) {
+	pcapDevices, err := pcap.FindAllDevs()
+	if err != nil {
+		return "", errors.New(fmt.Sprintf("list pcapDevices failed: %s", err.Error()))
+	}
+	var buf strings.Builder
+	for _, dev := range pcapDevices {
+		buf.WriteString(fmt.Sprint("Dev:", dev.Name, "\tDes:", dev.Description))
+		if len(dev.Addresses) > 0 {
+			buf.WriteString(fmt.Sprint("\tAddr:", dev.Addresses[0].IP.String()))
+		}
+		buf.WriteString("\n")
+	}
+	return buf.String(), nil
+}
 
 // GetDevByIp get dev name by dev ip (use pcap)
 func GetDevByIp(ip net.IP) (devName string, err error) {
