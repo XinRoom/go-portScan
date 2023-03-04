@@ -31,6 +31,7 @@ var portServiceOrder = map[uint16][]string{
 	1748:  {"oracle"},
 	1754:  {"oracle"},
 	3306:  {"mysql"},
+	3389:  {"ms-wbt-server"},
 	6379:  {"redis"},
 	9001:  {"mongodb"},
 	14238: {"oracle"},
@@ -183,6 +184,25 @@ func init() {
 				nil,
 				[]*regexp.Regexp{
 					regexp.MustCompile(`MBr\x00\x00\x00\x00\x88\x01@\x00`),
+				},
+			},
+		},
+	}
+
+	// ms-wbt-server
+	serviceRules["ms-wbt-server"] = serviceRule{
+		Tls: false,
+		DataGroup: []ruleData{
+			{
+				ActionSend,
+				[]byte("\x03\x00\x00*%\xe0\x00\x00\x00\x00\x00Cookie: mstshash=pcpc\r\n\x01\x00\x08\x00\x03\x00\x00\x00"),
+				nil,
+			},
+			{
+				ActionRecv,
+				nil,
+				[]*regexp.Regexp{
+					regexp.MustCompile(`\x03\x00\x00.\x0e\xd0\x00\x00\x124\x00`),
 				},
 			},
 		},
