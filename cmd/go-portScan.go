@@ -94,7 +94,17 @@ func run(c *cli.Context) error {
 	for _, _ip := range ips {
 		it, startIp, err := iprange.NewIter(_ip)
 		if err != nil {
-			myLog.Fatalf("[error] %s is not ip!\n", _ip)
+			var iprecords []net.IP
+			iprecords, _ = net.LookupIP(_ip)
+			if len(iprecords) > 0 {
+				_ip = iprecords[0].String()
+			} else {
+				myLog.Fatalf("[error] %s is not ip/hostname!\n", _ip)
+			}
+			it, startIp, err = iprange.NewIter(_ip)
+			if err != nil {
+				myLog.Fatalf("[error] %s is not ip!\n", _ip)
+			}
 		}
 		if firstIp == nil {
 			firstIp = startIp
