@@ -69,7 +69,7 @@ func main() {
 	start := time.Now()
 	for i := uint64(0); i < it.TotalNum(); i++ { // ip索引
 		ip := it.GetIpByIndex(i)
-		if !host.IsLive(ip.String()) { // ping
+		if !host.IsLive(ip.String(), false, 0) { // ping
 			continue
 		}
 		for _, _port := range ports { // port
@@ -91,6 +91,7 @@ package main
 import (
 	"github.com/XinRoom/go-portScan/core/host"
 	"github.com/XinRoom/go-portScan/core/port"
+	"github.com/XinRoom/go-portScan/core/port/tcp"
 	"github.com/XinRoom/iprange"
 	"log"
 	"net"
@@ -126,7 +127,7 @@ func main() {
 	it, _, _ := iprange.NewIter("1.1.1.1/30")
 
 	// scanner
-	ss, err := port.NewTcpScanner(retChan, port.DefaultTcpOption)
+	ss, err := tcp.NewTcpScanner(retChan, tcp.DefaultTcpOption)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,14 +137,14 @@ func main() {
 	for i := uint64(0); i < it.TotalNum(); i++ { // ip索引
 		ip := make(net.IP, len(it.GetIpByIndex(0)))
 		copy(ip, it.GetIpByIndex(i))   // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
-		if !host.IsLive(ip.String()) { // ping
+		if !host.IsLive(ip.String(), false, 0) { // ping
 			continue
 		}
 		for _, _port := range ports { // port
 			ss.WaitLimiter()
 			wg.Add(1)
-			go func(ip net.IP, port uint16) {
-				ss.Scan(ip, port)
+			go func(ip net.IP, _port uint16) {
+				ss.Scan(ip, _port)
 				wg.Done()
 			}(ip, _port)
 		}
@@ -185,34 +186,37 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --ip value                   target ip, eg: "1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2"
-   --iL value                   target ip file, eg: "ips.txt"
-   --port value, -p value       eg: "top1000,5612,65120,-" (default: "top1000")
-   --Pn                         no ping probe (default: false)
-   --rateP value, --rp value    concurrent num when ping probe each ip (default: 300)
-   --sT                         TCP-mode(support IPv4 and IPv6) (default: false)
-   --timeout value, --to value  TCP-mode SYN-mode timeout. unit is ms. (default: 800)
-   --sS                         Use SYN-mode(Only IPv4) (default: true)
-   --nexthop value, --nh value  specified nexthop gw add to pcap dev
-   --rate value, -r value       number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 2000(SYN-mode is restricted by the network adapter, 2000=1M) (default: -1)
-   --devices, --ld              list devices name (default: false)
-   --sV                         port service identify (default: false)
-   --httpx                      http server identify (default: false)
-   --netLive                    Detect live C-class networks, eg: -ip 192.168.0.0/16,172.16.0.0/12,10.0.0.0/8 (default: false)
-   --maxOpenPort value          Stop the ip scan, when the number of open-port is maxOpenPort (default: 0)
-   --help, -h                   show help (default: false)
+   --ip value                        target ip, eg: "1.1.1.1/30,1.1.1.1-1.1.1.2,1.1.1.1-2"
+   --iL value                        target ip file, eg: "ips.txt"
+   --port value, -p value            eg: "top1000,5612,65120,-" (default: "top1000")
+   --Pn                              no ping probe (default: false)
+   --rateP value, --rp value         concurrent num when ping probe each ip (default: 300)
+   --PT                              use TCP-PING mode (default: false)
+   --sT                              TCP-mode(support IPv4 and IPv6) (default: false)
+   --timeout value, --to value       TCP-mode SYN-mode timeout. unit is ms. (default: 800)
+   --sS                              Use SYN-mode(Only IPv4) (default: true)
+   --nexthop value, --nh value       specified nexthop gw add to pcap dev
+   --rate value, -r value            number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 1500(SYN-mode is restricted by the network adapter, 2000=1M) (default: -1)
+   --devices, --ld                   list devices name (default: false)
+   --sV                              port service identify (default: false)
+   --httpx                           http server identify (default: false)
+   --netLive                         Detect live C-class networks, eg: -ip 192.168.0.0/16,172.16.0.0/12,10.0.0.0/8 (default: false)
+   --maxOpenPort value, --mop value  Stop the ip scan, when the number of open-port is maxOpenPort (default: 0)
+   --oCsv value, --oC value          output csv file
+   --help, -h                        show help (default: false)
 ```
 
 关键参数说明：
 
 ```
---Pn 在目标禁止PING是使用
+--Pn 在目标禁止PING时使用
 --rate 在网络不稳定时（互联网）可以适当减少（互联网下建议500~1500）
 --timeout 在网络不稳定时（互联网）可以适当增加
---nexthop 用于在syn扫描模式下，路由网卡选择不对的情况，指定下一跳网关地址（需要是本地网卡上绑定的网关地址）
+--nexthop 用于在syn扫描模式下，找不到路由网卡情况时，指定下一跳网关地址（需要是本地网卡上绑定的网关地址）
+--PT ICMP不通时，使用常见端口的TCP探测主机是否存活
 
 --sV 用于判断端口的服务（主要是探测风险比较大的服务）
 --netLive 用于抽取网络内6个左右IP进行存活探测
 --httpx 用于探测http服务的title等信息
---maxOpenPort 用于目标组内存在防扫描防火墙的情况，单个IP扫描到开放的端口到达该值就停止对该IP扫描，避免浪费时间（建议值500）
+--mop 用于目标组内存在防扫描防火墙的情况，单个IP扫描到开放的端口到达该值就停止对该IP扫描，避免浪费时间（建议值500）
 ```
