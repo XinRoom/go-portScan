@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/XinRoom/go-portScan/core/host"
 	"github.com/XinRoom/go-portScan/core/port"
-	"github.com/XinRoom/go-portScan/core/port/fingerprint"
 	"github.com/XinRoom/go-portScan/core/port/syn"
+	"github.com/XinRoom/go-portScan/core/port/tcp"
 	"github.com/XinRoom/go-portScan/util"
 	"github.com/XinRoom/iprange"
 	"github.com/panjf2000/ants/v2"
@@ -32,11 +32,6 @@ var (
 	nexthop     string
 	httpx       bool
 	netLive     bool
-	bp          bool
-	user        string
-	passwd      string
-	service     string
-	threadNum   int
 	maxOpenPort int
 )
 
@@ -156,24 +151,7 @@ func run(c *cli.Context) error {
 
 	// recv
 	single := make(chan struct{})
-	retChan := make(chan port.OpenIpPort, 65535)
-	// port fingerprint
-	var wgPortIdentify sync.WaitGroup
-	poolPortIdentify, _ := ants.NewPoolWithFunc(500, func(ipPort interface{}) {
-		ret := ipPort.(port.OpenIpPort)
-		if httpx {
-			_buf := fingerprint.ProbeHttpInfo(ret.Ip, ret.Port)
-			if _buf != nil {
-				myLog.Printf("[HttpInfo]%s\n", _buf)
-			}
-		}
-		if sV {
-			myLog.Printf("%s:%d %s\n", ret.Ip, ret.Port, fingerprint.PortIdentify("tcp", ret.Ip, ret.Port))
-		}
-
-		wgPortIdentify.Done()
-	})
-	defer poolPortIdentify.Release()
+	retChan := make(chan port.OpenIpPort, 5000)
 
 	// ip port num status
 	ipPortNumMap := make(map[string]int) // 记录该IP端口开放数量
@@ -194,14 +172,7 @@ func run(c *cli.Context) error {
 					}
 					ipPortNumRW.Unlock()
 				}
-				if sV || httpx {
-					// port fingerprint
-					wgPortIdentify.Add(1)
-					poolPortIdentify.Invoke(ret)
-				}
-				if !sV {
-					myLog.Printf("%v:%d\n", ret.Ip, ret.Port)
-				}
+				myLog.Println(ret.String())
 			default:
 				time.Sleep(time.Millisecond * 10)
 			}
@@ -211,19 +182,21 @@ func run(c *cli.Context) error {
 	// Initialize the Scanner
 	var s port.Scanner
 	option := port.Option{
-		Rate:    rate,
-		Timeout: timeout,
-		NextHop: nexthop,
+		Rate:        rate,
+		Timeout:     timeout,
+		NextHop:     nexthop,
+		FingerPrint: sV,
+		Httpx:       httpx,
 	}
 	if sT {
 		// tcp
 		if option.Rate == -1 {
-			option.Rate = port.DefaultTcpOption.Rate
+			option.Rate = tcp.DefaultTcpOption.Rate
 		}
 		if option.Timeout == -1 {
-			option.Timeout = port.DefaultTcpOption.Timeout
+			option.Timeout = tcp.DefaultTcpOption.Timeout
 		}
-		s, err = port.NewTcpScanner(retChan, option)
+		s, err = tcp.NewTcpScanner(retChan, option)
 	} else {
 		// syn
 		if option.Rate == -1 {
@@ -316,12 +289,11 @@ func run(c *cli.Context) error {
 			}
 		}
 	}
-	wgPing.Wait()         // PING组
-	wgScan.Wait()         // 扫描器-发
-	s.Wait()              // 扫描器-等
-	s.Close()             // 扫描器-收
-	<-single              // 接收器-收
-	wgPortIdentify.Wait() // 识别器-收
+	wgPing.Wait() // PING组
+	wgScan.Wait() // 扫描器-发
+	s.Wait()      // 扫描器-等
+	s.Close()     // 扫描器-收
+	<-single      // 接收器-收
 	myLog.Printf("[*] elapsed time: %s\n", time.Since(start))
 	return nil
 }
@@ -386,7 +358,7 @@ func main() {
 			&cli.IntFlag{
 				Name:    "rate",
 				Aliases: []string{"r"},
-				Usage:   fmt.Sprintf("number of packets sent per second. If set -1, TCP-mode is %d, SYN-mode is %d(SYN-mode is restricted by the network adapter, 2000=1M)", port.DefaultTcpOption.Rate, syn.DefaultSynOption.Rate),
+				Usage:   fmt.Sprintf("number of packets sent per second. If set -1, TCP-mode is %d, SYN-mode is %d(SYN-mode is restricted by the network adapter, 2000=1M)", tcp.DefaultTcpOption.Rate, syn.DefaultSynOption.Rate),
 				Value:   -1,
 			},
 			&cli.BoolFlag{
@@ -411,9 +383,10 @@ func main() {
 				Value: false,
 			},
 			&cli.IntFlag{
-				Name:  "maxOpenPort",
-				Usage: "Stop the ip scan, when the number of open-port is maxOpenPort",
-				Value: 0,
+				Name:    "maxOpenPort",
+				Aliases: []string{"mop"},
+				Usage:   "Stop the ip scan, when the number of open-port is maxOpenPort",
+				Value:   0,
 			},
 		},
 	}

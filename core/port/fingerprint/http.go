@@ -16,14 +16,14 @@ var ErrOverflow = errors.New("OverflowMax")
 type Options struct {
 }
 
-func newHttpClient() *http.Client {
+func newHttpClient(dialTimeout time.Duration) *http.Client {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS10,
 		},
 		DialContext: (&net.Dialer{
-			Timeout: 5 * time.Second,
+			Timeout: dialTimeout,
 		}).DialContext,
 		MaxIdleConnsPerHost:   1,
 		IdleConnTimeout:       100 * time.Millisecond,

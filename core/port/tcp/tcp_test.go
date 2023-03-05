@@ -1,7 +1,8 @@
-package port
+package tcp
 
 import (
 	"github.com/XinRoom/go-portScan/core/host"
+	"github.com/XinRoom/go-portScan/core/port"
 	"github.com/XinRoom/iprange"
 	"log"
 	"net"
@@ -13,7 +14,7 @@ import (
 func TestTcpScanner_Scan(t *testing.T) {
 
 	single := make(chan struct{})
-	retChan := make(chan OpenIpPort, 65535)
+	retChan := make(chan port.OpenIpPort, 65535)
 	go func() {
 		for {
 			select {
@@ -30,7 +31,7 @@ func TestTcpScanner_Scan(t *testing.T) {
 	}()
 
 	// 解析端口字符串并且优先发送 TopTcpPorts 中的端口, eg: 1-65535,top1000
-	ports, err := ShuffleParseAndMergeTopPorts("top1000")
+	ports, err := port.ShuffleParseAndMergeTopPorts("top1000")
 	if err != nil {
 		t.Fatal(err)
 	}

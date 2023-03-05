@@ -10,7 +10,7 @@ import (
 type synScanner struct {
 }
 
-// NewSynScanner firstIp: Used to select routes; retChan: Result return channel
+// NewSynScanner firstIp: Used to select routes; openPortChan: Result return channel
 func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Option) (ss *synScanner, err error) {
 	return nil, ErrorNoSyn
 }

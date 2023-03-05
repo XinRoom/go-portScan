@@ -2,6 +2,7 @@ package port
 
 import (
 	"errors"
+	"fmt"
 	"github.com/XinRoom/go-portScan/util"
 	"net"
 	"strconv"
@@ -97,15 +98,68 @@ type Scanner interface {
 
 // OpenIpPort retChan
 type OpenIpPort struct {
-	Ip   net.IP
-	Port uint16
+	Ip       net.IP
+	Port     uint16
+	Service  string
+	HttpInfo *HttpInfo
+}
+
+func (op OpenIpPort) String() string {
+	buf := strings.Builder{}
+	buf.WriteString(op.Ip.String())
+	buf.WriteString(":")
+	buf.WriteString(strconv.Itoa(int(op.Port)))
+	if op.Service != "" {
+		buf.WriteString(" ")
+		buf.WriteString(op.Service)
+	}
+	if op.HttpInfo != nil {
+		buf.WriteString("\n")
+		buf.WriteString(op.HttpInfo.String())
+	}
+	return buf.String()
 }
 
 // Option ...
 type Option struct {
-	Rate    int    // 每秒速度限制, 单位: s, 会在1s内平均发送, 相当于每个包之间的延迟
-	Timeout int    // TCP连接响应延迟, 单位: ms
-	NextHop string // pcap dev name
+	Rate        int    // 每秒速度限制, 单位: s, 会在1s内平均发送, 相当于每个包之间的延迟
+	Timeout     int    // TCP连接响应延迟, 单位: ms
+	NextHop     string // pcap dev name
+	FingerPrint bool   // 服务探测
+	Httpx       bool   // HttpInfo 探测
+}
+
+// HttpInfo Http服务基础信息
+type HttpInfo struct {
+	StatusCode int      // 状态码
+	ContentLen int      // 相应包大小
+	Url        string   // Url
+	Location   string   // 302、301重定向路径
+	Title      string   // 标题
+	Server     string   // 服务名
+	TlsCN      string   // tls使用者名称
+	TlsDNS     []string // tlsDNS列表
+}
+
+func (hi *HttpInfo) String() string {
+	if hi == nil {
+		return ""
+	}
+	var buf strings.Builder
+	buf.WriteString(fmt.Sprintf("[HttpInfo]%s StatusCode:%d ContentLen:%d Title:%s ", hi.Url, hi.StatusCode, hi.ContentLen, hi.Title))
+	if hi.Location != "" {
+		buf.WriteString("Location:" + hi.Location + " ")
+	}
+	if hi.TlsCN != "" {
+		buf.WriteString("TlsCN:" + hi.TlsCN + " ")
+	}
+	if len(hi.TlsDNS) > 0 {
+		buf.WriteString("TlsDNS:" + strings.Join(hi.TlsDNS, ",") + " ")
+	}
+	if hi.Server != "" {
+		buf.WriteString("Server:" + hi.Server + " ")
+	}
+	return buf.String()
 }
 
 // ParsePortRangeStr 解析端口字符串

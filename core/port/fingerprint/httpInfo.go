@@ -2,53 +2,22 @@ package fingerprint
 
 import (
 	"fmt"
+	"github.com/XinRoom/go-portScan/core/port"
 	"github.com/XinRoom/go-portScan/util"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 )
-
-// HttpInfo Http服务基础信息
-type HttpInfo struct {
-	StatusCode int      // 状态码
-	ContentLen int      // 相应包大小
-	Url        string   // Url
-	Location   string   // 302、301重定向路径
-	Title      string   // 标题
-	Server     string   // 服务名
-	TlsCN      string   // tls使用者名称
-	TlsDNS     []string // tlsDNS列表
-}
 
 var httpsTopPort = []uint16{443, 4443, 1443, 8443}
 
 var httpClient *http.Client
 
-func (hi *HttpInfo) String() string {
-	if hi == nil {
-		return ""
-	}
-	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("%s StatusCode:%d ContentLen:%d Title:%s ", hi.Url, hi.StatusCode, hi.ContentLen, hi.Title))
-	if hi.Location != "" {
-		buf.WriteString("Location:" + hi.Location + " ")
-	}
-	if hi.TlsCN != "" {
-		buf.WriteString("TlsCN:" + hi.TlsCN + " ")
-	}
-	if len(hi.TlsDNS) > 0 {
-		buf.WriteString("TlsDNS:" + strings.Join(hi.TlsDNS, ",") + " ")
-	}
-	if hi.Server != "" {
-		buf.WriteString("Server:" + hi.Server + " ")
-	}
-	return buf.String()
-}
-
-func ProbeHttpInfo(ip net.IP, _port uint16) *HttpInfo {
+func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, isDailTimeout bool) {
 
 	if httpClient == nil {
-		httpClient = newHttpClient()
+		httpClient = newHttpClient(dialTimeout)
 	}
 
 	var err error
@@ -57,7 +26,6 @@ func ProbeHttpInfo(ip net.IP, _port uint16) *HttpInfo {
 	var _body []byte
 	var resp *http.Response
 	var schemes []string
-	var httpInfo *HttpInfo
 
 	if util.IsUint16InList(_port, httpsTopPort) {
 		schemes = []string{"https", "http"}
@@ -72,6 +40,9 @@ func ProbeHttpInfo(ip net.IP, _port uint16) *HttpInfo {
 		req.Close = true // disable keepalive
 		resp, err = httpClient.Do(req)
 		if err != nil {
+			if strings.HasSuffix(err.Error(), "i/o timeout") {
+				return nil, true
+			}
 			continue
 		}
 		if resp.Body != http.NoBody && resp.Body != nil {
@@ -94,7 +65,7 @@ func ProbeHttpInfo(ip net.IP, _port uint16) *HttpInfo {
 				rewriteUrl = location
 			}
 			//
-			httpInfo = new(HttpInfo)
+			httpInfo = new(port.HttpInfo)
 			httpInfo.Url = resp.Request.URL.String()
 			httpInfo.StatusCode = resp.StatusCode
 			httpInfo.ContentLen = int(resp.ContentLength)
@@ -111,5 +82,5 @@ func ProbeHttpInfo(ip net.IP, _port uint16) *HttpInfo {
 		}
 	}
 
-	return httpInfo
+	return httpInfo, false
 }

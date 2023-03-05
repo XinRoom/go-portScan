@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/XinRoom/go-portScan/core/port"
+	"github.com/XinRoom/go-portScan/core/port/fingerprint"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -32,6 +33,9 @@ type synScanner struct {
 	bufPool *sync.Pool
 
 	//
+	option         port.Option
+	openPortChan   chan port.OpenIpPort // inside chan
+	portProbeWg    sync.WaitGroup
 	retChan        chan port.OpenIpPort // results chan
 	limiter        *limiter.Limiter
 	ctx            context.Context
@@ -40,7 +44,7 @@ type synScanner struct {
 	isDone         bool
 }
 
-// NewSynScanner firstIp: Used to select routes; retChan: Result return channel
+// NewSynScanner firstIp: Used to select routes; openPortChan: Result return channel
 func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Option) (ss *synScanner, err error) {
 	// option verify
 	if option.Rate <= 0 {
@@ -85,11 +89,25 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 				return gopacket.NewSerializeBuffer()
 			},
 		},
+		option:         option,
+		openPortChan:   make(chan port.OpenIpPort, cap(retChan)),
 		retChan:        retChan,
 		limiter:        limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), 10),
 		ctx:            context.Background(),
 		watchIpStatusT: newWatchIpStatusTable(time.Duration(option.Timeout)),
 		watchMacCacheT: newWatchMacCacheTable(),
+	}
+	if ss.option.FingerPrint || ss.option.Httpx {
+		go ss.portProbeHandle()
+	} else {
+		go func() {
+			for t := range ss.openPortChan {
+				ss.retChan <- t
+				if t.Port == 0 {
+					break
+				}
+			}
+		}()
 	}
 
 	// Pcap
@@ -122,6 +140,17 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 func (ss *synScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 	if ss.isDone {
 		return errors.New("scanner is closed")
+	}
+
+	// 与recv协同，当队列缓冲区到达80%时降半速，90%将为1/s
+	if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*8 {
+		if ss.option.Rate/2 != 0 {
+			ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(ss.option.Rate/2)))
+		}
+	} else if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*9 {
+		ss.limiter.SetLimit(1)
+	} else {
+		ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(ss.option.Rate)))
 	}
 
 	dstIp = dstIp.To4()
@@ -161,16 +190,16 @@ func (ss *synScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 		DstIP:    dstIp,
 		Version:  4,
 		TTL:      128,
-		Id:       uint16(50000 + rand.Intn(500)),
+		Id:       uint16(40000 + rand.Intn(10000)),
 		Flags:    layers.IPv4DontFragment,
 		Protocol: layers.IPProtocolTCP,
 	}
 	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(49000 + rand.Intn(5000)), // Random source port and used to determine recv dst port range
+		SrcPort: layers.TCPPort(49000 + rand.Intn(10000)), // Random source port and used to determine recv dst port range
 		DstPort: layers.TCPPort(dst),
 		SYN:     true,
 		Window:  65280,
-		Seq:     uint32(500000 + rand.Intn(5000)),
+		Seq:     uint32(500000 + rand.Intn(10000)),
 		Options: []layers.TCPOption{
 			{
 				OptionType:   layers.TCPOptionKindMSS,
@@ -206,6 +235,7 @@ func (ss *synScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 }
 
 func (ss *synScanner) Wait() {
+	ss.portProbeWg.Wait()
 	// Delay 2s for a reply from the last packet
 	for i := 0; i < 20; i++ {
 		if ss.watchIpStatusT.IsEmpty() {
@@ -218,7 +248,7 @@ func (ss *synScanner) Wait() {
 // Close cleans up the handle and chan.
 func (ss *synScanner) Close() {
 	ss.isDone = true
-	ss.retChan <- port.OpenIpPort{}
+	ss.openPortChan <- port.OpenIpPort{}
 	if ss.handle != nil {
 		ss.handle.Close()
 	}
@@ -240,6 +270,24 @@ func (ss *synScanner) WaitLimiter() error {
 // GetDevName Get the device name after the route selection
 func (ss synScanner) GetDevName() string {
 	return ss.devName
+}
+
+func (ss *synScanner) portProbeHandle() {
+	for openIpPort := range ss.openPortChan {
+		ss.portProbeWg.Add(1)
+		go func(_openIpPort port.OpenIpPort) {
+			if _openIpPort.Port != 0 {
+				if ss.option.FingerPrint {
+					_openIpPort.Service, _ = fingerprint.PortIdentify("tcp", _openIpPort.Ip, _openIpPort.Port, time.Second)
+				}
+				if ss.option.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
+					_openIpPort.HttpInfo, _ = fingerprint.ProbeHttpInfo(_openIpPort.Ip, _openIpPort.Port, time.Second)
+				}
+			}
+			ss.retChan <- _openIpPort
+			ss.portProbeWg.Done()
+		}(openIpPort)
+	}
 }
 
 // getHwAddrV4 get the destination hardware address for our packets.
@@ -394,7 +442,7 @@ func (ss *synScanner) recv() {
 		}
 
 		// tcp Match ip and port
-		if tcpLayer.DstPort != 0 && tcpLayer.DstPort >= 49000 && tcpLayer.DstPort <= 54000 {
+		if tcpLayer.DstPort != 0 && tcpLayer.DstPort >= 49000 && tcpLayer.DstPort <= 59000 {
 			ipStr = ipLayer.SrcIP.String()
 			_port = uint16(tcpLayer.SrcPort)
 			if !ss.watchIpStatusT.HasIp(ipStr) { // IP
@@ -408,10 +456,6 @@ func (ss *synScanner) recv() {
 			}
 
 			if tcpLayer.SYN && tcpLayer.ACK {
-				ss.retChan <- port.OpenIpPort{
-					Ip:   ipLayer.SrcIP,
-					Port: _port,
-				}
 				// reply to target
 				eth.DstMAC = ethLayer.SrcMAC
 				ip4.DstIP = ipLayer.SrcIP
@@ -419,8 +463,13 @@ func (ss *synScanner) recv() {
 				tcp.SrcPort = tcpLayer.DstPort
 				// RST && ACK
 				tcp.Ack = tcpLayer.Seq + 1
+				tcp.Seq = tcpLayer.Ack
 				tcp.SetNetworkLayerForChecksum(&ip4)
 				ss.send(&eth, &ip4, &tcp)
+				ss.openPortChan <- port.OpenIpPort{
+					Ip:   ipLayer.SrcIP,
+					Port: _port,
+				}
 			}
 			tcpLayer.DstPort = 0 // clean tcp parse status
 		}

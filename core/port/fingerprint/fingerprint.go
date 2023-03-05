@@ -40,7 +40,7 @@ var readBufPool = &sync.Pool{
 }
 
 // PortIdentify 端口识别
-func PortIdentify(network string, ip net.IP, _port uint16) string {
+func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Duration) (serviceName string, isDailTimeout bool) {
 
 	matchedRule := make(map[string]struct{})
 
@@ -51,11 +51,11 @@ func PortIdentify(network string, ip net.IP, _port uint16) string {
 	if serviceNames, ok := portServiceOrder[_port]; ok {
 		for _, service := range serviceNames {
 			matchedRule[service] = struct{}{}
-			matchStatus = matchRule(network, ip, _port, serviceRules[service])
+			matchStatus = matchRule(network, ip, _port, serviceRules[service], dailTimeout)
 			if matchStatus == 1 {
-				return service
+				return service, false
 			} else if matchStatus == -1 {
-				return unknown
+				return unknown, true
 			}
 		}
 	}
@@ -76,10 +76,10 @@ func PortIdentify(network string, ip net.IP, _port uint16) string {
 				continue
 			}
 			if conn == nil {
-				conn, err = net.DialTimeout(network, address, time.Second*2)
+				conn, err = net.DialTimeout(network, address, dailTimeout)
 				if err != nil {
 					if strings.HasSuffix(err.Error(), "i/o timeout") {
-						return unknown
+						return unknown, true
 					}
 					continue
 				}
@@ -96,7 +96,7 @@ func PortIdentify(network string, ip net.IP, _port uint16) string {
 
 			matchStatus = matchRuleWhithBuf(buf[:n], ip, _port, serviceRules[service])
 			if matchStatus == 1 {
-				return service
+				return service, false
 			}
 		}
 		for _, service := range onlyRecv {
@@ -111,11 +111,11 @@ func PortIdentify(network string, ip net.IP, _port uint16) string {
 			continue
 		}
 		matchedRule[service] = struct{}{}
-		matchStatus = matchRule(network, ip, _port, serviceRules[service])
+		matchStatus = matchRule(network, ip, _port, serviceRules[service], dailTimeout)
 		if matchStatus == 1 {
-			return service
+			return service, false
 		} else if matchStatus == -1 {
-			return unknown
+			return unknown, true
 		}
 	}
 
@@ -125,15 +125,15 @@ func PortIdentify(network string, ip net.IP, _port uint16) string {
 		if ok {
 			continue
 		}
-		matchStatus = matchRule(network, ip, _port, rule)
+		matchStatus = matchRule(network, ip, _port, rule, dailTimeout)
 		if matchStatus == 1 {
-			return service
+			return service, false
 		} else if matchStatus == -1 {
-			return unknown
+			return unknown, true
 		}
 	}
 
-	return unknown
+	return unknown, false
 }
 
 // 指纹匹配函数
@@ -161,7 +161,7 @@ func matchRuleWhithBuf(buf, ip net.IP, _port uint16, serviceRule serviceRule) in
 }
 
 // 指纹匹配函数
-func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule) int {
+func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule, dailTimeout time.Duration) int {
 	var err error
 	var isTls bool
 	var conn net.Conn
@@ -172,7 +172,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule)
 	// 建立连接
 	if serviceRule.Tls {
 		// tls
-		connTls, err = tls.DialWithDialer(&net.Dialer{Timeout: 2 * time.Second}, network, address, &tls.Config{
+		connTls, err = tls.DialWithDialer(&net.Dialer{Timeout: dailTimeout}, network, address, &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS10,
 		})
@@ -185,7 +185,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule)
 		defer connTls.Close()
 		isTls = true
 	} else {
-		conn, err = net.DialTimeout(network, address, time.Second*2)
+		conn, err = net.DialTimeout(network, address, dailTimeout)
 		if err != nil {
 			if strings.HasSuffix(err.Error(), "i/o timeout") {
 				return -1
