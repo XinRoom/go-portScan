@@ -102,7 +102,9 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 	} else {
 		go func() {
 			for t := range ss.openPortChan {
+				ss.portProbeWg.Add(1)
 				ss.retChan <- t
+				ss.portProbeWg.Done()
 				if t.Port == 0 {
 					break
 				}
