@@ -14,7 +14,7 @@ import (
 
 var CanIcmp bool
 
-var TcpPingPorts = []uint16{80, 22, 445, 23, 443, 81, 111, 3389, 8080, 8081}
+var TcpPingPorts = []uint16{80, 22, 445, 23, 443, 81, 161, 3389, 8080, 8081}
 
 // 判断是否支持发送icmp包
 func init() {
