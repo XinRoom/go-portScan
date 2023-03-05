@@ -24,6 +24,7 @@ var (
 	ipStr       string
 	portStr     string
 	pn          bool
+	pt          bool
 	sT          bool
 	rate        int
 	sV          bool
@@ -46,6 +47,7 @@ func parseFlag(c *cli.Context) {
 	devices = c.Bool("devices")
 	pn = c.Bool("Pn")
 	rateP = c.Int("rateP")
+	pt = c.Bool("PT")
 	rate = c.Int("rate")
 	sT = c.Bool("sT")
 	sV = c.Bool("sV")
@@ -117,7 +119,7 @@ func run(c *cli.Context) error {
 	poolIpsLive, _ := ants.NewPoolWithFunc(rateP, func(ip interface{}) {
 		_ip := ip.([]net.IP)
 		for _, ip2 := range _ip {
-			if host.IsLive(ip2.String()) {
+			if host.IsLive(ip2.String(), pt, time.Duration(tcp.DefaultTcpOption.Timeout)*time.Millisecond) {
 				myLog.Printf("[+] %s is live\n", ip2.String())
 				break
 			}
@@ -297,7 +299,7 @@ func run(c *cli.Context) error {
 	// Pool - ping and port scan
 	poolPing, _ := ants.NewPoolWithFunc(rateP, func(ip interface{}) {
 		_ip := ip.(net.IP)
-		if host.IsLive(_ip.String()) {
+		if host.IsLive(_ip.String(), pt, time.Duration(option.Timeout)*time.Millisecond) {
 			portScan(_ip)
 		}
 		wgPing.Done()
@@ -361,6 +363,11 @@ func main() {
 				Aliases: []string{"rp"},
 				Usage:   "concurrent num when ping probe each ip",
 				Value:   300,
+			},
+			&cli.BoolFlag{
+				Name:  "PT",
+				Usage: "use TCP-PING mode",
+				Value: false,
 			},
 			&cli.BoolFlag{
 				Name:  "sT",

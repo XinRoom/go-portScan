@@ -2,29 +2,38 @@ package host
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/go-ping/ping"
+	"net"
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
 var CanIcmp bool
 
+var TcpPingPorts = []uint16{80, 22, 445, 23, 443, 81, 111, 3389, 8080, 8081}
+
 // 判断是否支持发送icmp包
 func init() {
-	if IcmpOK("localhost") {
+	if IcmpOK("127.0.0.1") {
 		CanIcmp = true
 	}
 }
 
 // IsLive 判断ip是否存活
-func IsLive(ip string) bool {
+func IsLive(ip string, tcpPing bool, tcpTimeout time.Duration) (ok bool) {
 	if CanIcmp {
-		return IcmpOK(ip)
+		ok = IcmpOK(ip)
 	} else {
-		return PingOk(ip)
+		ok = PingOk(ip)
 	}
+	if !ok && tcpPing {
+		ok = TcpPing(ip, TcpPingPorts, tcpTimeout)
+	}
+	return
 }
 
 // PingOk Ping命令模式
@@ -74,4 +83,23 @@ func IcmpOK(host string) bool {
 		return true
 	}
 	return false
+}
+
+// TcpPing 指定默认常见端口进行存活探测
+func TcpPing(host string, ports []uint16, timeout time.Duration) (ok bool) {
+	var wg sync.WaitGroup
+	for _, port := range ports {
+		time.Sleep(10 * time.Millisecond)
+		wg.Add(1)
+		go func(_port uint16) {
+			conn, _ := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, _port), timeout)
+			if conn != nil {
+				conn.Close()
+				ok = true
+			}
+			wg.Done()
+		}(port)
+	}
+	wg.Wait()
+	return
 }
