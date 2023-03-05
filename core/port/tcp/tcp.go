@@ -16,7 +16,7 @@ var DefaultTcpOption = port.Option{
 	Timeout: 800,
 }
 
-type tcpScanner struct {
+type TcpScanner struct {
 	ports   []uint16             // 指定端口
 	retChan chan port.OpenIpPort // 返回值队列
 	limiter *limiter.Limiter
@@ -27,7 +27,7 @@ type tcpScanner struct {
 }
 
 // NewTcpScanner Tcp扫描器
-func NewTcpScanner(retChan chan port.OpenIpPort, option port.Option) (ts *tcpScanner, err error) {
+func NewTcpScanner(retChan chan port.OpenIpPort, option port.Option) (ts *TcpScanner, err error) {
 	// option verify
 	if option.Rate <= 0 {
 		err = errors.New("rate can not set to 0")
@@ -38,7 +38,7 @@ func NewTcpScanner(retChan chan port.OpenIpPort, option port.Option) (ts *tcpSca
 		return
 	}
 
-	ts = &tcpScanner{
+	ts = &TcpScanner{
 		retChan: retChan,
 		limiter: limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), 10),
 		ctx:     context.Background(),
@@ -50,7 +50,7 @@ func NewTcpScanner(retChan chan port.OpenIpPort, option port.Option) (ts *tcpSca
 }
 
 // Scan 对指定IP和dis port进行扫描
-func (ts *tcpScanner) Scan(ip net.IP, dst uint16) error {
+func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 	if ts.isDone {
 		return errors.New("scanner is closed")
 	}
@@ -83,16 +83,16 @@ func (ts *tcpScanner) Scan(ip net.IP, dst uint16) error {
 	return nil
 }
 
-func (ts *tcpScanner) Wait() {
+func (ts *TcpScanner) Wait() {
 }
 
 // Close chan
-func (ts *tcpScanner) Close() {
+func (ts *TcpScanner) Close() {
 	ts.isDone = true
 	ts.retChan <- port.OpenIpPort{}
 }
 
 // WaitLimiter Waiting for the speed limit
-func (ts *tcpScanner) WaitLimiter() error {
+func (ts *TcpScanner) WaitLimiter() error {
 	return ts.limiter.Wait(ts.ctx)
 }

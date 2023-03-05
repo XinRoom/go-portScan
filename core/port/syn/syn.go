@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-type synScanner struct {
+type SynScanner struct {
 	srcMac, gwMac net.HardwareAddr // macAddr
 	devName       string           // eth dev(pcap)
 
@@ -45,7 +45,7 @@ type synScanner struct {
 }
 
 // NewSynScanner firstIp: Used to select routes; openPortChan: Result return channel
-func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Option) (ss *synScanner, err error) {
+func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Option) (ss *SynScanner, err error) {
 	// option verify
 	if option.Rate <= 0 {
 		err = errors.New("rate can not set to 0")
@@ -76,7 +76,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 
 	rand.Seed(time.Now().Unix())
 
-	ss = &synScanner{
+	ss = &SynScanner{
 		opts: gopacket.SerializeOptions{
 			FixLengths:       true,
 			ComputeChecksums: true,
@@ -139,7 +139,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 }
 
 // Scan scans the dst IP address and port of this scanner.
-func (ss *synScanner) Scan(dstIp net.IP, dst uint16) (err error) {
+func (ss *SynScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 	if ss.isDone {
 		return errors.New("scanner is closed")
 	}
@@ -236,7 +236,7 @@ func (ss *synScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 	return
 }
 
-func (ss *synScanner) Wait() {
+func (ss *SynScanner) Wait() {
 	ss.portProbeWg.Wait()
 	// Delay 2s for a reply from the last packet
 	for i := 0; i < 20; i++ {
@@ -248,7 +248,7 @@ func (ss *synScanner) Wait() {
 }
 
 // Close cleans up the handle and chan.
-func (ss *synScanner) Close() {
+func (ss *SynScanner) Close() {
 	ss.isDone = true
 	ss.openPortChan <- port.OpenIpPort{}
 	if ss.handle != nil {
@@ -265,16 +265,16 @@ func (ss *synScanner) Close() {
 }
 
 // WaitLimiter Waiting for the speed limit
-func (ss *synScanner) WaitLimiter() error {
+func (ss *SynScanner) WaitLimiter() error {
 	return ss.limiter.Wait(ss.ctx)
 }
 
 // GetDevName Get the device name after the route selection
-func (ss synScanner) GetDevName() string {
+func (ss SynScanner) GetDevName() string {
 	return ss.devName
 }
 
-func (ss *synScanner) portProbeHandle() {
+func (ss *SynScanner) portProbeHandle() {
 	for openIpPort := range ss.openPortChan {
 		ss.portProbeWg.Add(1)
 		go func(_openIpPort port.OpenIpPort) {
@@ -293,7 +293,7 @@ func (ss *synScanner) portProbeHandle() {
 }
 
 // getHwAddrV4 get the destination hardware address for our packets.
-func (ss *synScanner) getHwAddrV4(arpDst net.IP) (mac net.HardwareAddr, err error) {
+func (ss *SynScanner) getHwAddrV4(arpDst net.IP) (mac net.HardwareAddr, err error) {
 	ipStr := arpDst.String()
 	if ss.watchMacCacheT.IsNeedWatch(ipStr) {
 		return nil, errors.New("arp of this ip has been in monitoring")
@@ -346,7 +346,7 @@ func (ss *synScanner) getHwAddrV4(arpDst net.IP) (mac net.HardwareAddr, err erro
 }
 
 // send sends the given layers as a single packet on the network.
-func (ss *synScanner) send(l ...gopacket.SerializableLayer) error {
+func (ss *SynScanner) send(l ...gopacket.SerializableLayer) error {
 	buf := ss.bufPool.Get().(gopacket.SerializeBuffer)
 	defer func() {
 		buf.Clear()
@@ -359,7 +359,7 @@ func (ss *synScanner) send(l ...gopacket.SerializableLayer) error {
 }
 
 // send sends the given layers as a single packet on the network., need fix padding
-func (ss *synScanner) sendArp(l ...gopacket.SerializableLayer) error {
+func (ss *SynScanner) sendArp(l ...gopacket.SerializableLayer) error {
 	buf := ss.bufPool.Get().(gopacket.SerializeBuffer)
 	defer func() {
 		buf.Clear()
@@ -372,7 +372,7 @@ func (ss *synScanner) sendArp(l ...gopacket.SerializableLayer) error {
 }
 
 // recv packet on the network.
-func (ss *synScanner) recv() {
+func (ss *SynScanner) recv() {
 	eth := layers.Ethernet{
 		SrcMAC:       ss.srcMac,
 		DstMAC:       nil,
