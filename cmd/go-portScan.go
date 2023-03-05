@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"github.com/XinRoom/go-portScan/core/host"
 	"github.com/XinRoom/go-portScan/core/port"
@@ -13,6 +14,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +35,7 @@ var (
 	httpx       bool
 	netLive     bool
 	maxOpenPort int
+	oCsv        string
 )
 
 func parseFlag(c *cli.Context) {
@@ -50,6 +53,7 @@ func parseFlag(c *cli.Context) {
 	httpx = c.Bool("httpx")
 	netLive = c.Bool("netLive")
 	maxOpenPort = c.Int("maxOpenPort")
+	oCsv = c.String("oCsv")
 }
 
 func run(c *cli.Context) error {
@@ -157,6 +161,19 @@ func run(c *cli.Context) error {
 	ipPortNumMap := make(map[string]int) // 记录该IP端口开放数量
 	var ipPortNumRW sync.RWMutex
 
+	// csv output
+	var csvFile *os.File
+	var csvWrite *csv.Writer
+	if oCsv != "" {
+		csvFile, err = os.Create(oCsv)
+		if err != nil {
+			myLog.Fatalln("[-]", err)
+		}
+		defer csvFile.Close()
+		csvWrite = csv.NewWriter(csvFile)
+		csvWrite.Write([]string{"IP", "PORT", "SERVICE", "HTTP_TITLE", "HTTP_STATUS", "HTTP_SERVER", "HTTP_TLS"})
+	}
+
 	go func() {
 		for {
 			select {
@@ -173,6 +190,18 @@ func run(c *cli.Context) error {
 					ipPortNumRW.Unlock()
 				}
 				myLog.Println(ret.String())
+				if csvWrite != nil {
+					line := []string{ret.Ip.String(), strconv.Itoa(int(ret.Port)), ret.Service, "", "", "", ""}
+					if ret.HttpInfo != nil {
+						line[3] = ret.HttpInfo.Title
+						line[4] = strconv.Itoa(ret.HttpInfo.StatusCode)
+						line[5] = ret.HttpInfo.Server
+						line[6] = ret.HttpInfo.TlsCN
+					}
+					csvWrite.Write(line)
+					csvWrite.Flush()
+					csvFile.Sync()
+				}
 			default:
 				time.Sleep(time.Millisecond * 10)
 			}
@@ -387,6 +416,12 @@ func main() {
 				Aliases: []string{"mop"},
 				Usage:   "Stop the ip scan, when the number of open-port is maxOpenPort",
 				Value:   0,
+			},
+			&cli.StringFlag{
+				Name:    "oCsv",
+				Aliases: []string{"oC"},
+				Usage:   "output csv file",
+				Value:   "",
 			},
 		},
 	}
