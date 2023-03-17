@@ -6,6 +6,11 @@
 
 High-performance port scanner.
 
+> *免责声明:*  
+> 本工具由网络公开资料编写而成，仅进行网络信息状态验证，不具备侵害计算机系统的能力；若由本工具或衍生工具造成的任何直接或间接后果及损失，均由使用者本人负责，作者不承担任何责任。  
+> *安全警示:*  
+> 使用本工具必须遵守相关网络安全法律，禁止进行非授权的侵入性测试。
+
 ## Feature
 
 - Syn stateless scan
@@ -161,11 +166,25 @@ To see [./cmd/go-portScan.go](./cmd/go-portScan.go)
 
 ## Cmd Build
 
+普通编译
+
 ```
 git clone https://github.com/XinRoom/go-portScan
 cd go-portScan
-go get
-go build cmd/go-portScan.go
+go get -d -u ./...
+go build -trimpath -ldflags="-s -w" -tags urfave_cli_no_docs cmd/go-portScan.go
+```
+
+Linux静态链接编译（需要docker环境）
+
+```
+sh ./build/build_static_alpine.sh
+```
+
+禁用syn模块，只保留tcp的编译(以便能在未安装pcap的windows机子上运行)
+
+```
+go build -trimpath -ldflags="-s -w" -tags urfave_cli_no_docs,nosyn cmd/go-portScan.go
 ```
 
 ## Cmd Usage
@@ -203,6 +222,7 @@ GLOBAL OPTIONS:
    --netLive                         Detect live C-class networks, eg: -ip 192.168.0.0/16,172.16.0.0/12,10.0.0.0/8 (default: false)
    --maxOpenPort value, --mop value  Stop the ip scan, when the number of open-port is maxOpenPort (default: 0)
    --oCsv value, --oC value          output csv file
+   --oFile value, -o value           output to file
    --help, -h                        show help (default: false)
 ```
 
