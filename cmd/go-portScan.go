@@ -37,6 +37,7 @@ var (
 	netLive     bool
 	maxOpenPort int
 	oCsv        string
+	oFile       string
 )
 
 func parseFlag(c *cli.Context) {
@@ -56,14 +57,15 @@ func parseFlag(c *cli.Context) {
 	netLive = c.Bool("netLive")
 	maxOpenPort = c.Int("maxOpenPort")
 	oCsv = c.String("oCsv")
+	oFile = c.String("oFile")
 }
 
 func run(c *cli.Context) error {
-	myLog := util.NewLogger("output.log", true)
 	if c.NumFlags() == 0 {
 		cli.ShowAppHelpAndExit(c, 0)
 	}
 	parseFlag(c)
+	myLog := util.NewLogger(oFile, true)
 	if devices {
 		if r, err := syn.GetAllDevs(); err != nil {
 			myLog.Fatal(err.Error())
@@ -428,6 +430,12 @@ func main() {
 				Name:    "oCsv",
 				Aliases: []string{"oC"},
 				Usage:   "output csv file",
+				Value:   "",
+			},
+			&cli.StringFlag{
+				Name:    "oFile",
+				Aliases: []string{"o"},
+				Usage:   "output to file",
 				Value:   "",
 			},
 		},
