@@ -10,6 +10,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	limiter "golang.org/x/time/rate"
+	"io"
 	"math/rand"
 	"net"
 	"sync"
@@ -105,9 +106,6 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 				ss.portProbeWg.Add(1)
 				ss.retChan <- t
 				ss.portProbeWg.Done()
-				if t.Port == 0 {
-					break
-				}
 			}
 		}()
 	}
@@ -141,7 +139,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 // Scan scans the dst IP address and port of this scanner.
 func (ss *SynScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 	if ss.isDone {
-		return errors.New("scanner is closed")
+		return io.EOF
 	}
 
 	// 与recv协同，当队列缓冲区到达80%时降半速，90%将为1/s
@@ -250,7 +248,6 @@ func (ss *SynScanner) Wait() {
 // Close cleans up the handle and chan.
 func (ss *SynScanner) Close() {
 	ss.isDone = true
-	ss.openPortChan <- port.OpenIpPort{}
 	if ss.handle != nil {
 		ss.handle.Close()
 	}
@@ -262,6 +259,8 @@ func (ss *SynScanner) Close() {
 	}
 	ss.watchMacCacheT = nil
 	ss.watchIpStatusT = nil
+	close(ss.openPortChan)
+	close(ss.retChan)
 }
 
 // WaitLimiter Waiting for the speed limit
@@ -419,6 +418,9 @@ func (ss *SynScanner) recv() {
 		// Read in the next packet.
 		data, _, err = ss.handle.ReadPacketData()
 		if err != nil {
+			if err == io.EOF {
+				return
+			}
 			continue
 		}
 

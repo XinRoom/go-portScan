@@ -179,37 +179,29 @@ func run(c *cli.Context) error {
 	}
 
 	go func() {
-		for {
-			select {
-			case ret := <-retChan:
-				if ret.Port == 0 {
-					single <- struct{}{}
-					return
+		for ret := range retChan {
+			if maxOpenPort > 0 {
+				ipPortNumRW.Lock()
+				if _, ok := ipPortNumMap[ret.Ip.String()]; ok {
+					ipPortNumMap[ret.Ip.String()] += 1
 				}
-				if maxOpenPort > 0 {
-					ipPortNumRW.Lock()
-					if _, ok := ipPortNumMap[ret.Ip.String()]; ok {
-						ipPortNumMap[ret.Ip.String()] += 1
-					}
-					ipPortNumRW.Unlock()
+				ipPortNumRW.Unlock()
+			}
+			myLog.Println(ret.String())
+			if csvWrite != nil {
+				line := []string{ret.Ip.String(), strconv.Itoa(int(ret.Port)), ret.Service, "", "", "", ""}
+				if ret.HttpInfo != nil {
+					line[3] = ret.HttpInfo.Title
+					line[4] = strconv.Itoa(ret.HttpInfo.StatusCode)
+					line[5] = ret.HttpInfo.Server
+					line[6] = ret.HttpInfo.TlsCN
 				}
-				myLog.Println(ret.String())
-				if csvWrite != nil {
-					line := []string{ret.Ip.String(), strconv.Itoa(int(ret.Port)), ret.Service, "", "", "", ""}
-					if ret.HttpInfo != nil {
-						line[3] = ret.HttpInfo.Title
-						line[4] = strconv.Itoa(ret.HttpInfo.StatusCode)
-						line[5] = ret.HttpInfo.Server
-						line[6] = ret.HttpInfo.TlsCN
-					}
-					csvWrite.Write(line)
-					csvWrite.Flush()
-					csvFile.Sync()
-				}
-			default:
-				time.Sleep(time.Millisecond * 10)
+				csvWrite.Write(line)
+				csvWrite.Flush()
+				csvFile.Sync()
 			}
 		}
+		single <- struct{}{}
 	}()
 
 	// Initialize the Scanner
