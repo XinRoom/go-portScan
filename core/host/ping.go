@@ -2,6 +2,7 @@ package host
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/go-ping/ping"
 	"net"
@@ -88,14 +89,24 @@ func IcmpOK(host string) bool {
 // TcpPing 指定默认常见端口进行存活探测
 func TcpPing(host string, ports []uint16, timeout time.Duration) (ok bool) {
 	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
+	d := net.Dialer{
+		Timeout:   timeout + time.Second,
+		KeepAlive: 0,
+	}
 	for _, port := range ports {
 		time.Sleep(10 * time.Millisecond)
 		wg.Add(1)
 		go func(_port uint16) {
-			conn, _ := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, _port), timeout)
+			conn, err := d.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", host, _port))
 			if conn != nil {
 				conn.Close()
 				ok = true
+			} else if err != nil && strings.Contains(err.Error(), "refused it") { // 表明对端发送了RST包
+				ok = true
+			}
+			if ok {
+				cancel()
 			}
 			wg.Done()
 		}(port)
