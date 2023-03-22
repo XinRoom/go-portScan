@@ -117,7 +117,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 		return
 	}
 	// Set filter, Reduce the number of monitoring packets
-	handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp)", srcMac.String()))
+	handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp[tcpflags] == tcp-syn|tcp-ack)", srcMac.String()))
 	ss.handle = handle
 
 	// start listen recv
