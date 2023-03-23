@@ -16,18 +16,10 @@ func TestTcpScanner_Scan(t *testing.T) {
 	single := make(chan struct{})
 	retChan := make(chan port.OpenIpPort, 65535)
 	go func() {
-		for {
-			select {
-			case ret := <-retChan:
-				if ret.Port == 0 {
-					single <- struct{}{}
-					return
-				}
-				log.Println(ret)
-			default:
-				time.Sleep(time.Millisecond * 10)
-			}
+		for ret := range retChan {
+			log.Println(ret)
 		}
+		single <- struct{}{}
 	}()
 
 	// 解析端口字符串并且优先发送 TopTcpPorts 中的端口, eg: 1-65535,top1000
@@ -49,8 +41,8 @@ func TestTcpScanner_Scan(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := uint64(0); i < it.TotalNum(); i++ { // ip索引
 		ip := make(net.IP, len(it.GetIpByIndex(0)))
-		copy(ip, it.GetIpByIndex(i))   // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
-		if !host.IsLive(ip.String()) { // ping
+		copy(ip, it.GetIpByIndex(i))             // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
+		if !host.IsLive(ip.String(), false, 0) { // ping
 			continue
 		}
 		for _, _port := range ports { // port
@@ -62,6 +54,7 @@ func TestTcpScanner_Scan(t *testing.T) {
 			}(ip, _port)
 		}
 	}
+	ss.Wait()
 	ss.Close()
 	<-single
 	t.Log(time.Since(start))

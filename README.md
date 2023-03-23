@@ -42,18 +42,10 @@ func main() {
 	single := make(chan struct{})
 	retChan := make(chan port.OpenIpPort, 65535)
 	go func() {
-		for {
-			select {
-			case ret := <-retChan:
-				if ret.Port == 0 {
-					single <- struct{}{}
-					return
-				}
-				log.Println(ret)
-			default:
-				time.Sleep(time.Millisecond * 10)
-			}
+		for ret := range retChan {
+			log.Println(ret)
 		}
+		single <- struct{}{}
 	}()
 
 	// 解析端口字符串并且优先发送 TopTcpPorts 中的端口, eg: 1-65535,top1000
@@ -82,6 +74,7 @@ func main() {
 			ss.Scan(ip, _port) // syn 不能并发，默认以网卡和驱动最高性能发包
 		}
 	}
+	ss.Wait()
 	ss.Close()
 	<-single
 	log.Println(time.Since(start))
@@ -108,18 +101,10 @@ func main() {
 	single := make(chan struct{})
 	retChan := make(chan port.OpenIpPort, 65535)
 	go func() {
-		for {
-			select {
-			case ret := <-retChan:
-				if ret.Port == 0 {
-					single <- struct{}{}
-					return
-				}
-				log.Println(ret)
-			default:
-				time.Sleep(time.Millisecond * 10)
-			}
+		for ret := range retChan {
+			log.Println(ret)
 		}
+		single <- struct{}{}
 	}()
 
 	// 解析端口字符串并且优先发送 TopTcpPorts 中的端口, eg: 1-65535,top1000
@@ -154,6 +139,7 @@ func main() {
 			}(ip, _port)
 		}
 	}
+	ss.Wait()
 	ss.Close()
 	<-single
 	log.Println(time.Since(start))
