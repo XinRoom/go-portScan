@@ -58,16 +58,16 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 		Ip:   ip,
 		Port: dst,
 	}
-	var isTimeout bool
+	var isDailErr bool
 	if ts.option.FingerPrint {
-		openIpPort.Service, isTimeout = fingerprint.PortIdentify("tcp", ip, dst, ts.timeout)
-		if isTimeout {
+		openIpPort.Service, isDailErr = fingerprint.PortIdentify("tcp", ip, dst, ts.timeout)
+		if isDailErr {
 			return nil
 		}
 	}
 	if ts.option.Httpx && (openIpPort.Service == "" || openIpPort.Service == "http" || openIpPort.Service == "https") {
-		openIpPort.HttpInfo, isTimeout = fingerprint.ProbeHttpInfo(ip, dst, ts.timeout)
-		if isTimeout {
+		openIpPort.HttpInfo, isDailErr = fingerprint.ProbeHttpInfo(ip, dst, ts.timeout)
+		if isDailErr {
 			return nil
 		}
 	}

@@ -14,7 +14,7 @@ var httpsTopPort = []uint16{443, 4443, 1443, 8443}
 
 var httpClient *http.Client
 
-func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, isDailTimeout bool) {
+func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, isDailErr bool) {
 
 	if httpClient == nil {
 		httpClient = newHttpClient(dialTimeout)
@@ -40,7 +40,7 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 		req.Close = true // disable keepalive
 		resp, err = httpClient.Do(req)
 		if err != nil {
-			if strings.HasSuffix(err.Error(), "i/o timeout") {
+			if strings.HasSuffix(err.Error(), ioTimeoutStr) || strings.Contains(err.Error(), refusedStr) {
 				return nil, true
 			}
 			continue

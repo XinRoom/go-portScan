@@ -21,6 +21,11 @@ const (
 	ActionSend
 )
 
+const (
+	refusedStr   = "refused"
+	ioTimeoutStr = "i/o timeout"
+)
+
 type ruleData struct {
 	Action  Action // send or recv
 	Data    []byte // send or match data
@@ -40,7 +45,7 @@ var readBufPool = &sync.Pool{
 }
 
 // PortIdentify 端口识别
-func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Duration) (serviceName string, isDailTimeout bool) {
+func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Duration) (serviceName string, isDailErr bool) {
 
 	matchedRule := make(map[string]struct{})
 
@@ -63,40 +68,28 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 	// onlyRecv
 	{
 		var conn net.Conn
-		var err error
 		var n int
 		buf := readBufPool.Get().([]byte)
 		defer func() {
 			readBufPool.Put(buf)
 		}()
 		address := fmt.Sprintf("%s:%d", ip, _port)
-		for _, service := range onlyRecv {
-			_, ok := matchedRule[service]
-			if ok {
-				continue
-			}
-			if conn == nil {
-				conn, err = net.DialTimeout(network, address, dailTimeout)
-				if err != nil {
-					if strings.HasSuffix(err.Error(), "i/o timeout") {
-						return unknown, true
-					}
+		conn, _ = net.DialTimeout(network, address, dailTimeout)
+		if conn == nil {
+			return unknown, true
+		}
+		n, _ = read(conn, buf)
+		conn.Close()
+		if n != 0 {
+			for _, service := range onlyRecv {
+				_, ok := matchedRule[service]
+				if ok {
 					continue
 				}
-				n, err = read(conn, buf)
-				conn.Close()
-				// read出错就退出
-				if err != nil {
-					if strings.HasSuffix(err.Error(), "i/o timeout") {
-						break
-					}
-					continue
+				matchStatus = matchRuleWhithBuf(buf[:n], ip, _port, serviceRules[service])
+				if matchStatus == 1 {
+					return service, false
 				}
-			}
-
-			matchStatus = matchRuleWhithBuf(buf[:n], ip, _port, serviceRules[service])
-			if matchStatus == 1 {
-				return service, false
 			}
 		}
 		for _, service := range onlyRecv {
@@ -177,7 +170,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 			MinVersion:         tls.VersionTLS10,
 		})
 		if err != nil {
-			if strings.HasSuffix(err.Error(), "i/o timeout") {
+			if strings.HasSuffix(err.Error(), ioTimeoutStr) || strings.Contains(err.Error(), refusedStr) {
 				return -1
 			}
 			return 0
@@ -186,11 +179,8 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 		isTls = true
 	} else {
 		conn, err = net.DialTimeout(network, address, dailTimeout)
-		if err != nil {
-			if strings.HasSuffix(err.Error(), "i/o timeout") {
-				return -1
-			}
-			return 0
+		if conn == nil {
+			return -1
 		}
 		defer conn.Close()
 	}
@@ -218,9 +208,6 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 			}
 			if err != nil {
 				// 出错就退出
-				if strings.HasSuffix(err.Error(), "i/o timeout") {
-					return -1
-				}
 				return 0
 			}
 		} else {
@@ -231,7 +218,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 				n, err = read(conn, buf)
 			}
 			// 出错就退出
-			if err != nil || n == 0 {
+			if n == 0 {
 				return 0
 			}
 			// 包含数据就正确
