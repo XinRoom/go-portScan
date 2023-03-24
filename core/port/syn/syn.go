@@ -235,14 +235,19 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 }
 
 func (ss *SynScanner) Wait() {
-	ss.portProbeWg.Wait()
 	// Delay 2s for a reply from the last packet
 	for i := 0; i < 20; i++ {
 		if ss.watchIpStatusT.IsEmpty() {
-			return
+			break
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
+	// wait inside chan is empty
+	for len(ss.openPortChan) != 0 {
+		time.Sleep(time.Millisecond * 20)
+	}
+	// wait portProbe task
+	ss.portProbeWg.Wait()
 }
 
 // Close cleans up the handle and chan.
@@ -460,6 +465,10 @@ func (ss *SynScanner) recv() {
 			}
 
 			if tcpLayer.SYN && tcpLayer.ACK {
+				ss.openPortChan <- port.OpenIpPort{
+					Ip:   ipLayer.SrcIP,
+					Port: _port,
+				}
 				// reply to target
 				eth.DstMAC = ethLayer.SrcMAC
 				ip4.DstIP = ipLayer.SrcIP
@@ -470,10 +479,6 @@ func (ss *SynScanner) recv() {
 				tcp.Seq = tcpLayer.Ack
 				tcp.SetNetworkLayerForChecksum(&ip4)
 				ss.send(&eth, &ip4, &tcp)
-				ss.openPortChan <- port.OpenIpPort{
-					Ip:   ipLayer.SrcIP,
-					Port: _port,
-				}
 			}
 			tcpLayer.DstPort = 0 // clean tcp parse status
 		}
