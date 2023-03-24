@@ -13,6 +13,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -254,6 +255,28 @@ func (ss *SynScanner) Wait() {
 func (ss *SynScanner) Close() {
 	ss.isDone = true
 	if ss.handle != nil {
+		// In linux, pcap can not stop when no packets to sniff with BlockForever
+		// ref:https://github.com/google/gopacket/issues/890
+		// ref:https://github.com/google/gopacket/issues/1089
+		if runtime.GOOS == "linux" {
+			eth := layers.Ethernet{
+				SrcMAC:       ss.srcMac,
+				DstMAC:       ss.srcMac,
+				EthernetType: layers.EthernetTypeARP,
+			}
+			arp := layers.ARP{
+				AddrType:          layers.LinkTypeEthernet,
+				Protocol:          layers.EthernetTypeIPv4,
+				HwAddressSize:     6,
+				ProtAddressSize:   4,
+				Operation:         layers.ARPRequest,
+				SourceHwAddress:   []byte(ss.srcMac),
+				SourceProtAddress: []byte(ss.srcIp),
+				DstHwAddress:      []byte(ss.srcMac),
+				DstProtAddress:    []byte(ss.srcIp),
+			}
+			ss.sendArp(&eth, &arp)
+		}
 		ss.handle.Close()
 	}
 	if ss.watchMacCacheT != nil {
