@@ -51,8 +51,8 @@ type SynScanner struct {
 // NewSynScanner firstIp: Used to select routes; openPortChan: Result return channel
 func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Option) (ss *SynScanner, err error) {
 	// option verify
-	if option.Rate <= 0 {
-		err = errors.New("rate can not set to 0")
+	if option.Rate < 10 {
+		err = errors.New("rate can not set < 10")
 		return
 	}
 
@@ -96,7 +96,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 		option:         option,
 		openPortChan:   make(chan port.OpenIpPort, cap(retChan)),
 		retChan:        retChan,
-		limiter:        limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), 10),
+		limiter:        limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), option.Rate/10),
 		ctx:            context.Background(),
 		watchIpStatusT: newWatchIpStatusTable(time.Duration(option.Timeout)),
 		watchMacCacheT: newWatchMacCacheTable(),

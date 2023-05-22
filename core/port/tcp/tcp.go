@@ -29,8 +29,8 @@ type TcpScanner struct {
 // NewTcpScanner Tcp扫描器
 func NewTcpScanner(retChan chan port.OpenIpPort, option port.Option) (ts *TcpScanner, err error) {
 	// option verify
-	if option.Rate <= 0 {
-		err = errors.New("rate can not set to 0")
+	if option.Rate < 10 {
+		err = errors.New("rate can not set < 10")
 		return
 	}
 	if option.Timeout <= 0 {
@@ -40,7 +40,7 @@ func NewTcpScanner(retChan chan port.OpenIpPort, option port.Option) (ts *TcpSca
 
 	ts = &TcpScanner{
 		retChan: retChan,
-		limiter: limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), 10),
+		limiter: limiter.NewLimiter(limiter.Every(time.Second/time.Duration(option.Rate)), option.Rate/10),
 		ctx:     context.Background(),
 		timeout: time.Duration(option.Timeout) * time.Millisecond,
 		option:  option,
