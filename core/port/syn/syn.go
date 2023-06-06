@@ -271,13 +271,19 @@ func (ss *SynScanner) Close() {
 				Protocol:          layers.EthernetTypeIPv4,
 				HwAddressSize:     6,
 				ProtAddressSize:   4,
-				Operation:         layers.ARPRequest,
+				Operation:         layers.ARPReply,
 				SourceHwAddress:   []byte(ss.srcMac),
 				SourceProtAddress: []byte(ss.srcIp),
 				DstHwAddress:      []byte(ss.srcMac),
 				DstProtAddress:    []byte(ss.srcIp),
 			}
-			ss.sendArp(&eth, &arp)
+			handle, _ := pcap.OpenLive(ss.devName, 1024, false, time.Second)
+			buf := ss.bufPool.Get().(gopacket.SerializeBuffer)
+			gopacket.SerializeLayers(buf, ss.opts, &eth, &arp)
+			handle.WritePacketData(buf.Bytes())
+			handle.Close()
+			buf.Clear()
+			ss.bufPool.Put(buf)
 		}
 		ss.handle.Close()
 	}
