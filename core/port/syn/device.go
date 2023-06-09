@@ -111,7 +111,7 @@ func GetRouterV4(dst net.IP) (srcIp net.IP, srcMac net.HardwareAddr, gw net.IP, 
 	}
 	gw = gw.To4()
 	srcIp = srcIp.To4()
-	devName, _ = GetDevByIp(srcIp)
+	devName, err = GetDevByIp(srcIp)
 	if srcIp == nil || err != nil || srcMac == nil {
 		if err == nil {
 			err = fmt.Errorf("err")
