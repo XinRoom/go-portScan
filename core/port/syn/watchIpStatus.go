@@ -42,8 +42,8 @@ func (w *watchIpStatusTable) UpdateLastTime(ip string) {
 
 // RecordPort 记录收到的端口
 func (w *watchIpStatusTable) RecordPort(ip string, port uint16) {
-	lastTime := time.Now()
 	w.lock.Lock()
+	lastTime := time.Now()
 	wi, ok := w.watchIpS[ip]
 	if ok {
 		wi.LastTime = lastTime
