@@ -17,8 +17,8 @@ func NewShuffle(size uint64) *Shuffle {
 		return nil
 	}
 	sf := &Shuffle{size: size}
-	if size > 1000 {
-		sf.n = 1000
+	if size > 100 {
+		sf.n = 100
 	} else {
 		sf.n = uint16(size)
 	}
