@@ -30,6 +30,7 @@ var (
 	sV          bool
 	timeout     int
 	rateP       int
+	hostGroup   int
 	iL          string
 	devices     bool
 	nexthop     string
@@ -48,6 +49,7 @@ func parseFlag(c *cli.Context) {
 	devices = c.Bool("devices")
 	pn = c.Bool("Pn")
 	rateP = c.Int("rateP")
+	hostGroup = c.Int("hostGroup")
 	pt = c.Bool("PT")
 	rate = c.Int("rate")
 	sT = c.Bool("sT")
@@ -235,7 +237,6 @@ func run(c *cli.Context) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[error] Initialize Scanner: %s\n", err)
 		os.Exit(-1)
-		myLog.Fatalf("[error] Initialize Scanner: %s\n", err)
 	}
 
 	start := time.Now()
@@ -265,6 +266,7 @@ func run(c *cli.Context) error {
 			ipPortNumMap[ip.String()] = 0
 			ipPortNumRW.Unlock()
 		}
+		fmt.Println(ip.String())
 		for _, _port := range ports { // port
 			s.WaitLimiter() // limit rate
 
@@ -290,11 +292,21 @@ func run(c *cli.Context) error {
 		}
 	}
 
+	// host group scan func
+	var wgHostScan sync.WaitGroup
+	hostScan, _ := ants.NewPoolWithFunc(hostGroup, func(ip interface{}) {
+		_ip := ip.(net.IP)
+		portScan(_ip)
+		wgHostScan.Done()
+	})
+	defer hostScan.Release()
+
 	// Pool - ping and port scan
 	poolPing, _ := ants.NewPoolWithFunc(rateP, func(ip interface{}) {
 		_ip := ip.(net.IP)
 		if host.IsLive(_ip.String(), pt, time.Duration(option.Timeout)*time.Millisecond) {
-			portScan(_ip)
+			wgHostScan.Add(1)
+			hostScan.Invoke(_ip)
 		}
 		wgPing.Done()
 	})
@@ -310,15 +322,17 @@ func run(c *cli.Context) error {
 				wgPing.Add(1)
 				_ = poolPing.Invoke(ip)
 			} else {
-				portScan(ip)
+				wgHostScan.Add(1)
+				hostScan.Invoke(ip)
 			}
 		}
 	}
-	wgPing.Wait() // PING组
-	wgScan.Wait() // 扫描器-发
-	s.Wait()      // 扫描器-等
-	s.Close()     // 扫描器-收
-	<-single      // 接收器-收
+	wgPing.Wait()     // PING组
+	wgHostScan.Wait() // HostGroup
+	wgScan.Wait()     // 扫描器-发
+	s.Wait()          // 扫描器-等
+	s.Close()         // 扫描器-收
+	<-single          // 接收器-收
 	myLog.Printf("[*] elapsed time: %s\n", time.Since(start))
 	return nil
 }
@@ -357,6 +371,12 @@ func main() {
 				Aliases: []string{"rp"},
 				Usage:   "concurrent num when ping probe each ip",
 				Value:   300,
+			},
+			&cli.IntFlag{
+				Name:    "hostGroup",
+				Aliases: []string{"hp"},
+				Usage:   "host concurrent num",
+				Value:   200,
 			},
 			&cli.BoolFlag{
 				Name:  "PT",
