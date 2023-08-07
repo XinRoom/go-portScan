@@ -266,7 +266,6 @@ func run(c *cli.Context) error {
 			ipPortNumMap[ip.String()] = 0
 			ipPortNumRW.Unlock()
 		}
-		fmt.Println(ip.String())
 		for _, _port := range ports { // port
 			s.WaitLimiter() // limit rate
 
