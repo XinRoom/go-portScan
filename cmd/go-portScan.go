@@ -240,22 +240,7 @@ func run(c *cli.Context) error {
 	}
 
 	start := time.Now()
-	var wgScan sync.WaitGroup
 	var wgPing sync.WaitGroup
-
-	// Pool - port scan
-	size := option.Rate
-	if !sT {
-		// syn-mode Concurrency is not recommended !!!
-		// The default nic is sent at the maximum rate
-		size = 1
-	}
-	poolScan, _ := ants.NewPoolWithFunc(size, func(ipPort interface{}) {
-		_ipPort := ipPort.(port.OpenIpPort)
-		s.Scan(_ipPort.Ip, _ipPort.Port)
-		wgScan.Done()
-	})
-	defer poolScan.Release()
 
 	// port scan func
 	portScan := func(ip net.IP) {
@@ -277,12 +262,7 @@ func run(c *cli.Context) error {
 					break
 				}
 			}
-
-			wgScan.Add(1)
-			_ = poolScan.Invoke(port.OpenIpPort{
-				Ip:   ip,
-				Port: _port,
-			})
+			s.Scan(ip, _port)
 		}
 		if maxOpenPort > 0 {
 			ipPortNumRW.Lock()
@@ -327,8 +307,7 @@ func run(c *cli.Context) error {
 		}
 	}
 	wgPing.Wait()     // PING组
-	wgHostScan.Wait() // HostGroup
-	wgScan.Wait()     // 扫描器-发
+	wgHostScan.Wait() // HostGroupS
 	s.Wait()          // 扫描器-等
 	s.Close()         // 扫描器-收
 	<-single          // 接收器-收

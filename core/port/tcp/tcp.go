@@ -8,6 +8,7 @@ import (
 	"github.com/XinRoom/go-portScan/core/port/fingerprint"
 	limiter "golang.org/x/time/rate"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -24,6 +25,7 @@ type TcpScanner struct {
 	timeout time.Duration
 	isDone  bool
 	option  port.Option
+	wg      sync.WaitGroup
 }
 
 // NewTcpScanner Tcp扫描器
@@ -54,36 +56,42 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 	if ts.isDone {
 		return errors.New("scanner is closed")
 	}
-	openIpPort := port.OpenIpPort{
-		Ip:   ip,
-		Port: dst,
-	}
-	var isDailErr bool
-	if ts.option.FingerPrint {
-		openIpPort.Service, isDailErr = fingerprint.PortIdentify("tcp", ip, dst, ts.timeout)
-		if isDailErr {
-			return nil
+	ts.wg.Add(1)
+	go func() {
+		defer ts.wg.Done()
+		//fmt.Println(1)
+		openIpPort := port.OpenIpPort{
+			Ip:   ip,
+			Port: dst,
 		}
-	}
-	if ts.option.Httpx && (openIpPort.Service == "" || openIpPort.Service == "http" || openIpPort.Service == "https") {
-		openIpPort.HttpInfo, isDailErr = fingerprint.ProbeHttpInfo(ip, dst, ts.timeout)
-		if isDailErr {
-			return nil
+		var isDailErr bool
+		if ts.option.FingerPrint {
+			openIpPort.Service, isDailErr = fingerprint.PortIdentify("tcp", ip, dst, ts.timeout)
+			if isDailErr {
+				return
+			}
 		}
-	}
-	if !ts.option.FingerPrint && !ts.option.Httpx {
-		conn, _ := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, dst), ts.timeout)
-		if conn != nil {
-			conn.Close()
-		} else {
-			return nil
+		if ts.option.Httpx && (openIpPort.Service == "" || openIpPort.Service == "http" || openIpPort.Service == "https") {
+			openIpPort.HttpInfo, isDailErr = fingerprint.ProbeHttpInfo(ip, dst, ts.timeout)
+			if isDailErr {
+				return
+			}
 		}
-	}
-	ts.retChan <- openIpPort
+		if !ts.option.FingerPrint && !ts.option.Httpx {
+			conn, _ := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, dst), ts.timeout)
+			if conn != nil {
+				conn.Close()
+			} else {
+				return
+			}
+		}
+		ts.retChan <- openIpPort
+	}()
 	return nil
 }
 
 func (ts *TcpScanner) Wait() {
+	ts.wg.Wait()
 }
 
 // Close chan
