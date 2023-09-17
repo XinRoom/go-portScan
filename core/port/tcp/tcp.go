@@ -8,6 +8,7 @@ import (
 	"github.com/XinRoom/go-portScan/core/port/fingerprint"
 	limiter "golang.org/x/time/rate"
 	"net"
+	"strings"
 	"sync"
 	"time"
 )
@@ -75,6 +76,13 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 			openIpPort.HttpInfo, isDailErr = fingerprint.ProbeHttpInfo(ip, dst, ts.timeout)
 			if isDailErr {
 				return
+			}
+			if openIpPort.HttpInfo != nil {
+				if strings.HasPrefix(openIpPort.HttpInfo.Url, "https") {
+					openIpPort.Service = "https"
+				} else {
+					openIpPort.Service = "http"
+				}
 			}
 		}
 		if !ts.option.FingerPrint && !ts.option.Httpx {

@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -319,6 +320,13 @@ func (ss *SynScanner) portProbeHandle() {
 				}
 				if ss.option.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
 					_openIpPort.HttpInfo, _ = fingerprint.ProbeHttpInfo(_openIpPort.Ip, _openIpPort.Port, time.Second)
+					if _openIpPort.HttpInfo != nil {
+						if strings.HasPrefix(_openIpPort.HttpInfo.Url, "https") {
+							_openIpPort.Service = "https"
+						} else {
+							_openIpPort.Service = "http"
+						}
+					}
 				}
 			}
 			ss.retChan <- _openIpPort
