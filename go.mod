@@ -1,16 +1,17 @@
 module github.com/XinRoom/go-portScan
 
-go 1.17
+go 1.18
 
 require (
-	github.com/XinRoom/iprange v1.1.3
+	github.com/XinRoom/iprange v1.1.4
 	github.com/go-ping/ping v1.1.0
 	github.com/google/gopacket v1.1.19
 	github.com/jackpal/gateway v1.0.7
 	github.com/libp2p/go-netroute v0.2.1
 	github.com/panjf2000/ants/v2 v2.7.2
 	github.com/projectdiscovery/stringsutil v0.0.2
-	github.com/urfave/cli/v2 v2.25.0
+	github.com/twmb/murmur3 v1.1.8
+	github.com/urfave/cli/v2 v2.25.1
 	golang.org/x/net v0.8.0
 	golang.org/x/text v0.8.0
 	golang.org/x/time v0.3.0

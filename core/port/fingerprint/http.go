@@ -50,9 +50,6 @@ func newHttpClient(dialTimeout time.Duration) *http.Client {
 			if len(via) >= 2 {
 				return errors.New("stopped after 2 redirects")
 			}
-			if len(via) > 0 && via[len(via)-1].Response != nil && via[len(via)-1].Response.StatusCode != 301 {
-				return errors.New("only redirect 301")
-			}
 			return nil
 		},
 	}

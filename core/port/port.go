@@ -139,6 +139,7 @@ type HttpInfo struct {
 	Server     string   // 服务名
 	TlsCN      string   // tls使用者名称
 	TlsDNS     []string // tlsDNS列表
+	Fingers    []string // 识别到的web指纹
 }
 
 func (hi *HttpInfo) String() string {
@@ -158,6 +159,9 @@ func (hi *HttpInfo) String() string {
 	}
 	if hi.Server != "" {
 		buf.WriteString("Server:" + hi.Server + " ")
+	}
+	if len(hi.Fingers) != 0 {
+		buf.WriteString(fmt.Sprintf("Fingers:%s ", hi.Fingers))
 	}
 	return buf.String()
 }
