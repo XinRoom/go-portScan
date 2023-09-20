@@ -42,6 +42,7 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 	}
 
 	for _, scheme := range schemes {
+		var rewriteNum int
 	goReq:
 		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s://%s:%d/", scheme, ip.String(), _port), http.NoBody)
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
@@ -73,8 +74,9 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 			if rewriteUrl == "" && location != "" {
 				rewriteUrl = location
 			}
-			if location != "" {
+			if location != "" && rewriteNum < 3 {
 				req.URL, _ = url.Parse(location)
+				rewriteNum++
 				goto goReq
 			}
 			//
