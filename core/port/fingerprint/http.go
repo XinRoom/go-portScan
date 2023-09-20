@@ -31,6 +31,7 @@ func newHttpClient(dialTimeout time.Duration) *http.Client {
 		ExpectContinueTimeout: 3 * time.Second,
 		DisableKeepAlives:     true,
 		ForceAttemptHTTP2:     false,
+		Proxy:                 http.ProxyFromEnvironment,
 	}
 
 	// proxy
