@@ -58,15 +58,9 @@ func WebFingerIdent(resp *http.Response) (names []string) {
 				var b bytes.Buffer
 				resp.Header.Write(&b)
 				data = b.String()
-			case "faviconhash":
-				data = mmh3Hash32(standBase64(body))
 			}
 			var flag bool
 			switch finger2.Method {
-			case "faviconhash":
-				if data != "" && len(finger2.Keyword) > 0 && data == finger2.Keyword[0] {
-					flag = true
-				}
 			case "keyword":
 				if iskeyword(data, finger2.Keyword) {
 					flag = true
@@ -82,6 +76,27 @@ func WebFingerIdent(resp *http.Response) (names []string) {
 				}
 				names = append(names, finger.Name)
 				break
+			}
+		}
+	}
+	return
+}
+
+// WebFingerIdentByFavicon web系统指纹识别,通过Favicon.ico
+func WebFingerIdentByFavicon(body []byte) (names []string) {
+	var data string
+	data = mmh3Hash32(standBase64(body))
+	for _, finger := range WebFingers {
+		for _, finger2 := range finger.Fingers {
+			switch finger2.Method {
+			case "faviconhash":
+				if data != "" && len(finger2.Keyword) > 0 && data == finger2.Keyword[0] {
+					if finger2.Name != "" {
+						finger.Name += "," + finger2.Name
+					}
+					names = append(names, finger.Name)
+					break
+				}
 			}
 		}
 	}

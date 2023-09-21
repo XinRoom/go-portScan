@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -31,7 +30,6 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 	var err error
 	var rewriteUrl string
 	var body []byte
-	var _body []byte
 	var resp *http.Response
 	var schemes []string
 
@@ -43,24 +41,16 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 
 	for _, scheme := range schemes {
 		var rewriteNum int
+		url2 := fmt.Sprintf("%s://%s:%d/", scheme, ip.String(), _port)
 	goReq:
-		req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s://%s:%d/", scheme, ip.String(), _port), http.NoBody)
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
-		req.Header.Set("Accept-Encoding", "gzip, deflate")
-		req.Close = true // disable keepalive
-		resp, err = httpClient.Do(req)
+		resp, body, err = getReq(url2)
 		if err != nil {
 			if strings.HasSuffix(err.Error(), ioTimeoutStr) || strings.Contains(err.Error(), refusedStr) {
 				return nil, true
 			}
 			continue
 		}
-		if resp.Body != http.NoBody && resp.Body != nil {
-			body, _ = getBody(resp)
-			_body, err = DecodeData(body, resp.Header)
-			if err == nil {
-				body = _body
-			}
+		if resp != nil {
 			if resp.ContentLength == -1 {
 				resp.ContentLength = int64(len(body))
 			}
@@ -75,7 +65,10 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 				rewriteUrl = location
 			}
 			if location != "" && rewriteNum < 3 {
-				req.URL, _ = url.Parse(location)
+				if !strings.HasPrefix(location, "http") {
+					location = resp.Request.URL.String() + location
+				}
+				url2 = location
 				rewriteNum++
 				goto goReq
 			}
@@ -96,6 +89,17 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 			if err == nil {
 				resp.Body = io.NopCloser(bytes.NewReader(body))
 				httpInfo.Fingers = webfinger.WebFingerIdent(resp)
+				// favicon
+				fau := webfinger.FindFaviconUrl(string(body))
+				if fau != "" {
+					if !strings.HasPrefix(fau, "http") {
+						fau = resp.Request.URL.String() + fau
+					}
+					_, body2, err2 := getReq(fau)
+					if err2 == nil && len(body2) != 0 {
+						httpInfo.Fingers = append(httpInfo.Fingers, webfinger.WebFingerIdentByFavicon(body2)...)
+					}
+				}
 			}
 			if resp.StatusCode != 400 {
 				break
@@ -104,4 +108,28 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 	}
 
 	return httpInfo, false
+}
+
+func getReq(url2 string) (resp *http.Response, body []byte, err error) {
+	req, _ := http.NewRequest(http.MethodGet, url2, http.NoBody)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
+	req.Header.Set("Accept-Encoding", "gzip, deflate")
+	req.Close = true // disable keepalive
+	resp, err = httpClient.Do(req)
+	if err != nil {
+		return
+	}
+	if resp.Body != http.NoBody && resp.Body != nil {
+		body, _ = getBody(resp)
+		if contentTypes, _ := resp.Header["Content-Type"]; len(contentTypes) > 0 {
+			if strings.Contains(contentTypes[0], "text") {
+				_body, err2 := DecodeData(body, resp.Header)
+				if err2 == nil {
+					body = _body
+				}
+				resp.Body = io.NopCloser(bytes.NewReader(body))
+			}
+		}
+	}
+	return
 }

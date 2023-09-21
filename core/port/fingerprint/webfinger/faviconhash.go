@@ -5,7 +5,25 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/twmb/murmur3"
+	"regexp"
 )
+
+var (
+	shortcutText = regexp.MustCompile(`(?im)<link.*?rel=["']?shortcut icon["']?.*?>`)
+	shortcutHref = regexp.MustCompile(`(?im)href=['"]+(.*?)['"]+`)
+)
+
+func FindFaviconUrl(body string) string {
+	a := shortcutText.FindStringSubmatch(body)
+	if len(a) > 0 {
+		faviconLink := a[0]
+		b := shortcutHref.FindStringSubmatch(faviconLink)
+		if len(b) > 1 {
+			return b[1]
+		}
+	}
+	return ""
+}
 
 func mmh3Hash32(raw []byte) string {
 	var h32 = murmur3.New32()
