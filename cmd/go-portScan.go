@@ -177,7 +177,7 @@ func run(c *cli.Context) error {
 		}
 		defer csvFile.Close()
 		csvWrite = csv.NewWriter(csvFile)
-		csvWrite.Write([]string{"IP", "PORT", "SERVICE", "HTTP_TITLE", "HTTP_STATUS", "HTTP_SERVER", "HTTP_TLS"})
+		csvWrite.Write([]string{"IP", "PORT", "SERVICE", "HTTP_TITLE", "HTTP_STATUS", "HTTP_SERVER", "HTTP_TLS", "HTTP_FINGERS"})
 	}
 
 	go func() {
@@ -191,12 +191,13 @@ func run(c *cli.Context) error {
 			}
 			myLog.Println(ret.String())
 			if csvWrite != nil {
-				line := []string{ret.Ip.String(), strconv.Itoa(int(ret.Port)), ret.Service, "", "", "", ""}
+				line := []string{ret.Ip.String(), strconv.Itoa(int(ret.Port)), ret.Service, "", "", "", "", ""}
 				if ret.HttpInfo != nil {
 					line[3] = ret.HttpInfo.Title
 					line[4] = strconv.Itoa(ret.HttpInfo.StatusCode)
 					line[5] = ret.HttpInfo.Server
 					line[6] = ret.HttpInfo.TlsCN
+					line[7] = strings.Join(ret.HttpInfo.Fingers, ",")
 				}
 				csvWrite.Write(line)
 				csvWrite.Flush()
