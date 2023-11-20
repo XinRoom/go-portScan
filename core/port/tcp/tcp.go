@@ -67,13 +67,13 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 		}
 		var isDailErr bool
 		if ts.option.FingerPrint {
-			openIpPort.Service, isDailErr = fingerprint.PortIdentify("tcp", ip, dst, ts.timeout)
+			openIpPort.Service, isDailErr = fingerprint.PortIdentify("tcp", ip, dst, 2*time.Second)
 			if isDailErr {
 				return
 			}
 		}
 		if ts.option.Httpx && (openIpPort.Service == "" || openIpPort.Service == "http" || openIpPort.Service == "https") {
-			openIpPort.HttpInfo, isDailErr = fingerprint.ProbeHttpInfo(ip, dst, ts.timeout)
+			openIpPort.HttpInfo, isDailErr = fingerprint.ProbeHttpInfo(ip, dst, 2*time.Second)
 			if isDailErr {
 				return
 			}
