@@ -111,7 +111,10 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 }
 
 func getReq(url2 string) (resp *http.Response, body []byte, err error) {
-	req, _ := http.NewRequest(http.MethodGet, url2, http.NoBody)
+	req, err := http.NewRequest(http.MethodGet, url2, http.NoBody)
+	if err != nil {
+		return
+	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	req.Close = true // disable keepalive
