@@ -14,9 +14,11 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -67,6 +69,10 @@ func run(c *cli.Context) error {
 		cli.ShowAppHelpAndExit(c, 0)
 	}
 	parseFlag(c)
+	if c.Bool("nohup") {
+		signal.Ignore(syscall.SIGHUP)
+		signal.Ignore(syscall.SIGTERM)
+	}
 	myLog := util.NewLogger(oFile, true)
 	if devices {
 		if r, err := syn.GetAllDevs(); err != nil {
@@ -428,6 +434,11 @@ func main() {
 				Aliases: []string{"o"},
 				Usage:   "output to file",
 				Value:   "",
+			},
+			&cli.BoolFlag{
+				Name:  "nohup",
+				Usage: "nohup",
+				Value: false,
 			},
 		},
 	}
