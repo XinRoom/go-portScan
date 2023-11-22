@@ -13,7 +13,7 @@ var (
 	cutset        = "\n\t\v\f\r"
 	reTitle       = regexp.MustCompile(`(?im)<\s*title.*>(.*?)<\s*/\s*title>`)
 	reContentType = regexp.MustCompile(`(?im)\s*charset="(.*?)"|charset=(.*?)"\s*`)
-	reRefresh     = regexp.MustCompile(`(?im)\s*content=['"]\d;url=(.*?)['"]`)
+	reRefresh     = regexp.MustCompile(`(?im)\s*content=['"]\d;url=['"](.*?)['"]`)
 	reReplace     = regexp.MustCompile(`(?im)window\.location\.replace\(['"](.*?)['"]\)`)
 )
 
