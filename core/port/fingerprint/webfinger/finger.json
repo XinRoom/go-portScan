@@ -4782,6 +4782,26 @@
     ]
   },
   {
+    "name": "大华-智慧园区综合管理平台",
+    "fingers": [
+      {
+        "location": "body",
+        "method": "keyword",
+        "keyword": [
+          "<meta http-equiv=\"refresh\" content=\"1;URL='/WPMS'\"/>"
+        ]
+      },
+      {
+        "location": "body",
+        "method": "keyword",
+        "keyword": [
+          "DSS-help",
+          "appPath = \"/WPMS\";"
+        ]
+      }
+    ]
+  },
+  {
     "name": "大汉版通-Hanweb-system",
     "fingers": [
       {
