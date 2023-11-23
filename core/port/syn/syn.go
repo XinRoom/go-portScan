@@ -316,9 +316,11 @@ func (ss *SynScanner) portProbeHandle() {
 		go func(_openIpPort port.OpenIpPort) {
 			if _openIpPort.Port != 0 {
 				if ss.option.FingerPrint {
+					ss.WaitLimiter()
 					_openIpPort.Service, _ = fingerprint.PortIdentify("tcp", _openIpPort.Ip, _openIpPort.Port, 2*time.Second)
 				}
 				if ss.option.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
+					ss.WaitLimiter()
 					_openIpPort.HttpInfo, _ = fingerprint.ProbeHttpInfo(_openIpPort.Ip, _openIpPort.Port, 2*time.Second)
 					if _openIpPort.HttpInfo != nil {
 						if strings.HasPrefix(_openIpPort.HttpInfo.Url, "https") {
