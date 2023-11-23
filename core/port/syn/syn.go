@@ -306,7 +306,7 @@ func (ss *SynScanner) WaitLimiter() error {
 }
 
 // GetDevName Get the device name after the route selection
-func (ss SynScanner) GetDevName() string {
+func (ss *SynScanner) GetDevName() string {
 	return ss.devName
 }
 
