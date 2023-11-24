@@ -2,6 +2,7 @@ package webfinger
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -23,6 +24,9 @@ type WebFinger struct {
 }
 
 var WebFingers []WebFinger
+
+//go:embed finger.json
+var DefFingerData []byte
 
 // LoadWebFingerData 加载web指纹数据
 func LoadWebFingerData(file string) error {

@@ -14,9 +14,6 @@ import (
 	"time"
 )
 
-//go:embed webfinger/finger.json
-var fD []byte
-
 var httpsTopPort = []uint16{443, 4443, 1443, 8443}
 
 var httpClient *http.Client
@@ -85,7 +82,7 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 				httpInfo.TlsDNS = resp.TLS.PeerCertificates[0].DNSNames
 			}
 			// finger
-			err = webfinger.ParseWebFingerData(fD)
+			err = webfinger.ParseWebFingerData(webfinger.DefFingerData)
 			if err == nil {
 				resp.Body = io.NopCloser(bytes.NewReader(body))
 				httpInfo.Fingers = webfinger.WebFingerIdent(resp)
