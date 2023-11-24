@@ -3204,6 +3204,17 @@
     ]
   },
   {
+    "name": "spring",
+    "fingers": [
+      {
+        "name": "404",
+        "method": "keyword",
+        "location": "body",
+        "keyword": ["<h1>Whitelabel Error Page</h1>"]
+      }
+    ]
+  },
+  {
     "name": "SpringBoot",
     "fingers": [
       {
