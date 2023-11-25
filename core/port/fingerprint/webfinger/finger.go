@@ -51,26 +51,22 @@ func ParseWebFingerData(data []byte) error {
 
 // WebFingerIdent web系统指纹识别
 func WebFingerIdent(resp *http.Response) (names []string) {
-	var data string
+	var dataMap = make(map[string]string)
 	body, _ := io.ReadAll(resp.Body)
+	dataMap["body"] = string(body)
+	var b bytes.Buffer
+	resp.Header.Write(&b)
+	dataMap["header"] = b.String()
 	for _, finger := range WebFingers {
 		for _, finger2 := range finger.Fingers {
-			switch finger2.Location {
-			case "body":
-				data = string(body)
-			case "header":
-				var b bytes.Buffer
-				resp.Header.Write(&b)
-				data = b.String()
-			}
 			var flag bool
 			switch finger2.Method {
 			case "keyword":
-				if iskeyword(data, finger2.Keyword) {
+				if iskeyword(dataMap[finger2.Location], finger2.Keyword) {
 					flag = true
 				}
 			case "regular":
-				if isregular(data, finger2.Keyword) {
+				if isregular(dataMap[finger2.Location], finger2.Keyword) {
 					flag = true
 				}
 			}
