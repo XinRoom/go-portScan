@@ -60,6 +60,9 @@ func WebFingerIdent(resp *http.Response) (names []string) {
 	for _, finger := range WebFingers {
 		for _, finger2 := range finger.Fingers {
 			var flag bool
+			if _, ok := dataMap[finger2.Location]; !ok {
+				continue
+			}
 			switch finger2.Method {
 			case "keyword":
 				if iskeyword(dataMap[finger2.Location], finger2.Keyword) {
