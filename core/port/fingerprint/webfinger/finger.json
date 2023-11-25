@@ -5578,6 +5578,16 @@
     ]
   },
   {
+    "name": "深信服上网认证系统",
+    "fingers": [
+      {
+        "location": "body",
+        "method": "keyword",
+        "keyword": ["<div class=\"button\"><a href=\"/webAuth/\">"]
+      }
+    ]
+  },
+  {
     "name": "深信服下一代防火墙管理系统",
     "fingers": [
       { "location": "faviconhash", "method": "faviconhash", "keyword": ["123821839"] }
@@ -6429,6 +6439,31 @@
         "location": "body",
         "method": "keyword",
         "keyword": ["fp_download", "login.php", "logo-icon-ico72.png"]
+      }
+    ]
+  },
+  {
+    "name": "vue",
+    "fingers": [
+      {
+        "location": "body",
+        "method": "keyword",
+        "keyword": ["<div id=app>", "/chunk", "/app"]
+      }
+    ]
+  },
+  {
+    "name": "登录表单",
+    "fingers": [
+      {
+        "location": "body",
+        "method": "keyword",
+        "keyword": ["<input ","type=\"password\""]
+      },
+      {
+        "location": "body",
+        "method": "keyword",
+        "keyword": ["<INPUT ","TYPE=\"PASSWORD\""]
       }
     ]
   }
