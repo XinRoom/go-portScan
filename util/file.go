@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"os"
-	"strings"
 )
 
 func GetLines(filename string) (out []string, err error) {
@@ -18,13 +17,13 @@ func GetLines(filename string) (out []string, err error) {
 
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
 
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+		line := scanner.Text()
 		if line != "" {
 			out = append(out, line)
 		}
 	}
+	err = scanner.Err()
 	return
 }
