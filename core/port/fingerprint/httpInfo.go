@@ -63,7 +63,12 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 			}
 			if location != "" && rewriteNum < 3 {
 				if !strings.HasPrefix(location, "http") {
-					location = resp.Request.URL.String() + location
+					if strings.HasPrefix(location, "/") {
+						resp.Request.URL.Path = location
+					} else {
+						resp.Request.URL.Path = resp.Request.URL.Path[:strings.LastIndex(resp.Request.URL.Path, "/")+1] + location
+					}
+					location = resp.Request.URL.String()
 				}
 				url2 = location
 				rewriteNum++
