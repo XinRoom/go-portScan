@@ -11,6 +11,11 @@ var serviceOrder = []string{"http", "https", "ssh", "redis", "mysql"}
 
 var onlyRecv []string
 
+// 一组数据流，仅一次发送
+var groupFlows = map[string][]string{
+	"http": {"redis", "memcached"},
+}
+
 var portServiceOrder = map[uint16][]string{
 	21:    {"ftp"},
 	22:    {"ssh"},

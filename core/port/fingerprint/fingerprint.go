@@ -48,19 +48,28 @@ var readBufPool = &sync.Pool{
 func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Duration) (serviceName string, isDailErr bool) {
 
 	matchedRule := make(map[string]struct{})
+	// 记录对应服务已经进行过匹配
+	recordMatched := func(s string) {
+		matchedRule[s] = struct{}{}
+		if gf, ok := groupFlows[s]; ok {
+			for _, s2 := range gf {
+				matchedRule[s2] = struct{}{}
+			}
+		}
+	}
 
 	unknown := "unknown"
-	var matchStatus int
+	var sn string
 
 	// 优先判断port可能的服务
 	if serviceNames, ok := portServiceOrder[_port]; ok {
 		for _, service := range serviceNames {
-			matchedRule[service] = struct{}{}
-			matchStatus = matchRule(network, ip, _port, serviceRules[service], dailTimeout)
-			if matchStatus == 1 {
-				return service, false
-			} else if matchStatus == -1 {
-				return unknown, true
+			recordMatched(service)
+			sn, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
+			if sn != "" {
+				return sn, false
+			} else if isDailErr {
+				return unknown, isDailErr
 			}
 		}
 	}
@@ -86,14 +95,16 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 				if ok {
 					continue
 				}
-				matchStatus = matchRuleWhithBuf(buf[:n], ip, _port, serviceRules[service])
-				if matchStatus == 1 {
-					return service, false
+				for _, rule := range serviceRules[service].DataGroup {
+					if matchRuleWhithBuf(buf[:n], ip, _port, rule) {
+						return service, false
+					}
 				}
+
 			}
 		}
 		for _, service := range onlyRecv {
-			matchedRule[service] = struct{}{}
+			recordMatched(service)
 		}
 	}
 
@@ -103,25 +114,25 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 		if ok {
 			continue
 		}
-		matchedRule[service] = struct{}{}
-		matchStatus = matchRule(network, ip, _port, serviceRules[service], dailTimeout)
-		if matchStatus == 1 {
-			return service, false
-		} else if matchStatus == -1 {
+		recordMatched(service)
+		sn, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
+		if sn != "" {
+			return sn, false
+		} else if isDailErr {
 			return unknown, true
 		}
 	}
 
 	// other
-	for service, rule := range serviceRules {
+	for service := range serviceRules {
 		_, ok := matchedRule[service]
 		if ok {
 			continue
 		}
-		matchStatus = matchRule(network, ip, _port, rule, dailTimeout)
-		if matchStatus == 1 {
-			return service, false
-		} else if matchStatus == -1 {
+		sn, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
+		if sn != "" {
+			return sn, false
+		} else if isDailErr {
 			return unknown, true
 		}
 	}
@@ -130,31 +141,30 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 }
 
 // 指纹匹配函数
-func matchRuleWhithBuf(buf, ip net.IP, _port uint16, serviceRule serviceRule) int {
+func matchRuleWhithBuf(buf, ip net.IP, _port uint16, rule ruleData) bool {
 	data := []byte("")
 	// 逐个判断
-	for _, rule := range serviceRule.DataGroup {
-		if rule.Data != nil {
-			data = bytes.Replace(rule.Data, []byte("{IP}"), []byte(ip.String()), -1)
-			data = bytes.Replace(data, []byte("{PORT}"), []byte(strconv.Itoa(int(_port))), -1)
-		}
-		// 包含数据就正确
-		if rule.Regexps != nil {
-			for _, _regex := range rule.Regexps {
-				if _regex.MatchString(convert2utf8(string(buf))) {
-					return 1
-				}
+	//for _, rule := range serviceRule.DataGroup {
+	if rule.Data != nil {
+		data = bytes.Replace(rule.Data, []byte("{IP}"), []byte(ip.String()), -1)
+		data = bytes.Replace(data, []byte("{PORT}"), []byte(strconv.Itoa(int(_port))), -1)
+	}
+	// 包含数据就正确
+	if rule.Regexps != nil {
+		for _, _regex := range rule.Regexps {
+			if _regex.MatchString(convert2utf8(string(buf))) {
+				return true
 			}
 		}
-		if bytes.Compare(data, []byte("")) != 0 && bytes.Contains(buf, data) {
-			return 1
-		}
 	}
-	return 0
+	if bytes.Compare(data, []byte("")) != 0 && bytes.Contains(buf, data) {
+		return true
+	}
+	return false
 }
 
 // 指纹匹配函数
-func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule, dailTimeout time.Duration) int {
+func matchRule(network string, ip net.IP, _port uint16, serviceName string, dailTimeout time.Duration) (serviceNameRet string, isDailErr bool) {
 	var err error
 	var isTls bool
 	var conn net.Conn
@@ -162,8 +172,11 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 
 	address := fmt.Sprintf("%s:%d", ip, _port)
 
+	serviceRule2 := serviceRules[serviceName]
+	flowsService := groupFlows[serviceName]
+
 	// 建立连接
-	if serviceRule.Tls {
+	if serviceRule2.Tls {
 		// tls
 		connTls, err = tls.DialWithDialer(&net.Dialer{Timeout: dailTimeout}, network, address, &tls.Config{
 			InsecureSkipVerify: true,
@@ -171,16 +184,18 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 		})
 		if err != nil {
 			if strings.HasSuffix(err.Error(), ioTimeoutStr) || strings.Contains(err.Error(), refusedStr) {
-				return -1
+				isDailErr = true
+				return
 			}
-			return 0
+			return
 		}
 		defer connTls.Close()
 		isTls = true
 	} else {
 		conn, err = net.DialTimeout(network, address, dailTimeout)
 		if conn == nil {
-			return -1
+			isDailErr = true
+			return
 		}
 		defer conn.Close()
 	}
@@ -192,7 +207,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 
 	data := []byte("")
 	// 逐个判断
-	for _, rule := range serviceRule.DataGroup {
+	for _, rule := range serviceRule2.DataGroup {
 		if rule.Data != nil {
 			data = bytes.Replace(rule.Data, []byte("{IP}"), []byte(ip.String()), -1)
 			data = bytes.Replace(data, []byte("{PORT}"), []byte(strconv.Itoa(int(_port))), -1)
@@ -208,7 +223,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 			}
 			if err != nil {
 				// 出错就退出
-				return 0
+				return
 			}
 		} else {
 			var n int
@@ -219,23 +234,29 @@ func matchRule(network string, ip net.IP, _port uint16, serviceRule serviceRule,
 			}
 			// 出错就退出
 			if n == 0 {
-				return 0
+				return
 			}
 			// 包含数据就正确
-			if rule.Regexps != nil {
-				for _, _regex := range rule.Regexps {
-					if _regex.MatchString(convert2utf8(string(buf[:n]))) {
-						return 1
+			if matchRuleWhithBuf(buf[:n], ip, _port, rule) {
+				serviceNameRet = serviceName
+				return
+			}
+			// 可归并的服务规则组
+			for _, s := range flowsService {
+				for _, rule2 := range serviceRules[s].DataGroup {
+					if rule2.Action == ActionSend {
+						continue
+					}
+					if matchRuleWhithBuf(buf[:n], ip, _port, rule2) {
+						serviceNameRet = s
+						return
 					}
 				}
-			}
-			if bytes.Compare(data, []byte("")) != 0 && bytes.Contains(buf[:n], data) {
-				return 1
 			}
 		}
 	}
 
-	return 0
+	return
 }
 
 func read(conn interface{}, buf []byte) (int, error) {
