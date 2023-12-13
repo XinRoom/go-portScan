@@ -342,7 +342,7 @@ func init() {
 		DataGroup: []ruleData{
 			{
 				ActionSend,
-				[]byte("stats\\n"),
+				[]byte("stats\n"),
 				nil,
 			},
 			{
@@ -351,6 +351,7 @@ func init() {
 				[]*regexp.Regexp{
 					regexp.MustCompile(`(?s)^STAT pid \d`),
 					regexp.MustCompile(`(?s)^ERROR\r\n`),
+					regexp.MustCompile(`(?s)^SERVER_ERROR `),
 				},
 			},
 		},
