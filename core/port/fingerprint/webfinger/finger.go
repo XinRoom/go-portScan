@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // ref:https://github.com/EdgeSecurityTeam/EHole/blob/main/finger.json
@@ -56,12 +57,17 @@ func WebFingerIdent(resp *http.Response) (names []string) {
 	dataMap["body"] = string(body)
 	var b bytes.Buffer
 	resp.Header.Write(&b)
-	dataMap["header"] = b.String()
+	dataMap["header"] = strings.ToLower(b.String())
 	for _, finger := range WebFingers {
 		for _, finger2 := range finger.Fingers {
 			var flag bool
 			if _, ok := dataMap[finger2.Location]; !ok {
 				continue
+			}
+			if finger2.Location == "header" {
+				for i := 0; i < len(finger2.Keyword); i++ {
+					finger2.Keyword[i] = strings.ToLower(finger2.Keyword[i])
+				}
 			}
 			switch finger2.Method {
 			case "keyword":
