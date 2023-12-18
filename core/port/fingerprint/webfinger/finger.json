@@ -16156,14 +16156,13 @@
     ]
   },
   {
-    "name": "Docker_Daemon",
+    "name": "Docker_Daemon(2375)",
     "fingers": [
       {
         "location": "header",
         "method": "keyword",
-        "keyword": ["Content-Length:19"]
-      },
-      { "location": "header", "method": "keyword", "keyword": ["text/plain"] }
+        "keyword": ["Content-Length: 19", "text/plain"]
+      }
     ]
   },
   {
