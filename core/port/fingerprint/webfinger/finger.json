@@ -39161,14 +39161,16 @@
     ]
   },
   {
-    "name": "PBOOTCMS",
+    "name": "PbootCMS",
     "fingers": [
       {
         "location": "header",
         "method": "keyword",
         "keyword": ["set-cookie: pbootsystem="]
       },
-      { "location": "header", "method": "keyword", "keyword": ["PbootSystem"] }
+      { "location": "header", "method": "keyword", "keyword": ["PbootSystem"] },
+      { "location": "header", "method": "keyword", "keyword": ["PbootCMS"] },
+      { "location": "body", "method": "keyword", "keyword": ["src=\"/template/", "href=\"/?"] }
     ]
   },
   {
