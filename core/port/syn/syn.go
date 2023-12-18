@@ -317,7 +317,7 @@ func (ss *SynScanner) portProbeHandle() {
 			if _openIpPort.Port != 0 {
 				if ss.option.FingerPrint {
 					ss.WaitLimiter()
-					_openIpPort.Service, _ = fingerprint.PortIdentify("tcp", _openIpPort.Ip, _openIpPort.Port, 2*time.Second)
+					_openIpPort.Service, _openIpPort.Banner, _ = fingerprint.PortIdentify("tcp", _openIpPort.Ip, _openIpPort.Port, 2*time.Second)
 				}
 				if ss.option.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
 					ss.WaitLimiter()

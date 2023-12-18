@@ -101,6 +101,7 @@ type OpenIpPort struct {
 	Ip       net.IP
 	Port     uint16
 	Service  string
+	Banner   []byte
 	HttpInfo *HttpInfo
 }
 

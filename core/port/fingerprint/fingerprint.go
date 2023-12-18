@@ -45,7 +45,7 @@ var readBufPool = &sync.Pool{
 }
 
 // PortIdentify 端口识别
-func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Duration) (serviceName string, isDailErr bool) {
+func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Duration) (serviceName string, banner []byte, isDailErr bool) {
 
 	matchedRule := make(map[string]struct{})
 	// 记录对应服务已经进行过匹配
@@ -65,11 +65,11 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 	if serviceNames, ok := portServiceOrder[_port]; ok {
 		for _, service := range serviceNames {
 			recordMatched(service)
-			sn, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
+			sn, banner, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
 			if sn != "" {
-				return sn, false
+				return sn, banner, false
 			} else if isDailErr {
-				return unknown, isDailErr
+				return unknown, banner, isDailErr
 			}
 		}
 	}
@@ -85,11 +85,12 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 		address := fmt.Sprintf("%s:%d", ip, _port)
 		conn, _ = net.DialTimeout(network, address, dailTimeout)
 		if conn == nil {
-			return unknown, true
+			return unknown, banner, true
 		}
 		n, _ = read(conn, buf)
 		conn.Close()
 		if n != 0 {
+			banner = buf[:n]
 			for _, service := range onlyRecv {
 				_, ok := matchedRule[service]
 				if ok {
@@ -97,7 +98,7 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 				}
 				for _, rule := range serviceRules[service].DataGroup {
 					if matchRuleWhithBuf(buf[:n], ip, _port, rule) {
-						return service, false
+						return service, banner, false
 					}
 				}
 
@@ -115,11 +116,11 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 			continue
 		}
 		recordMatched(service)
-		sn, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
+		sn, banner, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
 		if sn != "" {
-			return sn, false
+			return sn, banner, false
 		} else if isDailErr {
-			return unknown, true
+			return unknown, banner, true
 		}
 	}
 
@@ -129,15 +130,15 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 		if ok {
 			continue
 		}
-		sn, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
+		sn, banner, isDailErr = matchRule(network, ip, _port, service, dailTimeout)
 		if sn != "" {
-			return sn, false
+			return sn, banner, false
 		} else if isDailErr {
-			return unknown, true
+			return unknown, banner, true
 		}
 	}
 
-	return unknown, false
+	return unknown, banner, false
 }
 
 // 指纹匹配函数
@@ -164,7 +165,7 @@ func matchRuleWhithBuf(buf, ip net.IP, _port uint16, rule ruleData) bool {
 }
 
 // 指纹匹配函数
-func matchRule(network string, ip net.IP, _port uint16, serviceName string, dailTimeout time.Duration) (serviceNameRet string, isDailErr bool) {
+func matchRule(network string, ip net.IP, _port uint16, serviceName string, dailTimeout time.Duration) (serviceNameRet string, banner []byte, isDailErr bool) {
 	var err error
 	var isTls bool
 	var conn net.Conn
@@ -236,6 +237,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 			if n == 0 {
 				return
 			}
+			banner = buf[:n]
 			// 包含数据就正确
 			if matchRuleWhithBuf(buf[:n], ip, _port, rule) {
 				serviceNameRet = serviceName

@@ -67,7 +67,7 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 		}
 		var isDailErr bool
 		if ts.option.FingerPrint {
-			openIpPort.Service, isDailErr = fingerprint.PortIdentify("tcp", ip, dst, 2*time.Second)
+			openIpPort.Service, openIpPort.Banner, isDailErr = fingerprint.PortIdentify("tcp", ip, dst, 2*time.Second)
 			if isDailErr {
 				return
 			}
