@@ -123,7 +123,6 @@ func main() {
 	}
 
 	start := time.Now()
-	var wg sync.WaitGroup
 	for i := uint64(0); i < it.TotalNum(); i++ { // ip索引
 		ip := make(net.IP, len(it.GetIpByIndex(0)))
 		copy(ip, it.GetIpByIndex(i))   // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
@@ -132,11 +131,7 @@ func main() {
 		}
 		for _, _port := range ports { // port
 			ss.WaitLimiter()
-			wg.Add(1)
-			go func(ip net.IP, _port uint16) {
-				ss.Scan(ip, _port)
-				wg.Done()
-			}(ip, _port)
+			ss.Scan(ip, _port)
 		}
 	}
 	ss.Wait()

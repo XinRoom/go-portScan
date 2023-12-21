@@ -6,7 +6,6 @@ import (
 	"github.com/XinRoom/iprange"
 	"log"
 	"net"
-	"sync"
 	"testing"
 	"time"
 )
@@ -38,7 +37,6 @@ func TestTcpScanner_Scan(t *testing.T) {
 	}
 
 	start := time.Now()
-	var wg sync.WaitGroup
 	for i := uint64(0); i < it.TotalNum(); i++ { // ip索引
 		ip := make(net.IP, len(it.GetIpByIndex(0)))
 		copy(ip, it.GetIpByIndex(i))             // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
@@ -47,11 +45,7 @@ func TestTcpScanner_Scan(t *testing.T) {
 		}
 		for _, _port := range ports { // port
 			ss.WaitLimiter()
-			wg.Add(1)
-			go func(ip net.IP, port uint16) {
-				ss.Scan(ip, port)
-				wg.Done()
-			}(ip, _port)
+			ss.Scan(ip, _port)
 		}
 	}
 	ss.Wait()
