@@ -4,8 +4,10 @@ import (
 	"github.com/XinRoom/go-portScan/core/host"
 	"github.com/XinRoom/go-portScan/core/port"
 	"github.com/XinRoom/iprange"
+	"github.com/panjf2000/ants/v2"
 	"log"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -36,18 +38,34 @@ func TestTcpScanner_Scan(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// port scan func
+	portScan := func(ip net.IP) {
+		for _, _port := range ports { // port
+			ss.WaitLimiter()
+			ss.Scan(ip, _port) // syn 不能并发，默认以网卡和驱动最高性能发包
+		}
+	}
+
+	// Pool - ping and port scan
+	var wgPing sync.WaitGroup
+	poolPing, _ := ants.NewPoolWithFunc(50, func(ip interface{}) {
+		_ip := ip.(net.IP)
+		if host.IsLive(_ip.String(), true, 800*time.Millisecond) {
+			portScan(_ip)
+		}
+		wgPing.Done()
+	})
+	defer poolPing.Release()
+
 	start := time.Now()
 	for i := uint64(0); i < it.TotalNum(); i++ { // ip索引
 		ip := make(net.IP, len(it.GetIpByIndex(0)))
-		copy(ip, it.GetIpByIndex(i))             // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
-		if !host.IsLive(ip.String(), false, 0) { // ping
-			continue
-		}
-		for _, _port := range ports { // port
-			ss.WaitLimiter()
-			ss.Scan(ip, _port)
-		}
+		copy(ip, it.GetIpByIndex(i)) // Note: dup copy []byte when concurrent (GetIpByIndex not to do dup copy)
+		wgPing.Add(1)
+		poolPing.Invoke(ip)
 	}
+
+	wgPing.Wait()
 	ss.Wait()
 	ss.Close()
 	<-single
