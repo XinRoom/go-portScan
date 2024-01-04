@@ -25,9 +25,8 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 	}
 
 	var err error
-	var rewriteUrl string
 	var body []byte
-	var resp *http.Response
+	var resps []*http.Response
 	var schemes []string
 
 	if util.IsUint16InList(_port, httpsTopPort) {
@@ -37,49 +36,25 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 	}
 
 	for _, scheme := range schemes {
-		var rewriteNum int
 		url2 := fmt.Sprintf("%s://%s:%d/", scheme, ip.String(), _port)
-	goReq:
-		resp, body, err = getReq(url2)
+		resps, body, err = getReq(url2, 3)
 		if err != nil {
 			if strings.HasSuffix(err.Error(), ioTimeoutStr) || strings.Contains(err.Error(), refusedStr) {
 				return nil, true
 			}
 			continue
 		}
-		if resp != nil {
-			if resp.ContentLength == -1 {
-				resp.ContentLength = int64(len(body))
-			}
-			rewriteUrl2, _ := resp.Location()
-			if rewriteUrl2 != nil {
-				rewriteUrl = rewriteUrl2.String()
-			} else {
-				rewriteUrl = ""
-			}
-			location := GetLocation(body)
-			if rewriteUrl == "" && location != "" {
-				rewriteUrl = location
-			}
-			if location != "" && rewriteNum < 3 {
-				if !strings.HasPrefix(location, "http") {
-					if strings.HasPrefix(location, "/") {
-						resp.Request.URL.Path = location
-					} else {
-						resp.Request.URL.Path = resp.Request.URL.Path[:strings.LastIndex(resp.Request.URL.Path, "/")+1] + location
-					}
-					location = resp.Request.URL.String()
-				}
-				url2 = location
-				rewriteNum++
-				goto goReq
-			}
+		if len(resps) > 0 {
+			resp := resps[len(resps)-1]
 			//
 			httpInfo = new(port.HttpInfo)
 			httpInfo.Url = resp.Request.URL.String()
 			httpInfo.StatusCode = resp.StatusCode
 			httpInfo.ContentLen = int(resp.ContentLength)
-			httpInfo.Location = rewriteUrl
+			rewriteUrl, err := resp.Location()
+			if err == nil {
+				httpInfo.Location = rewriteUrl.String()
+			}
 			httpInfo.Server = resp.Header.Get("Server")
 			httpInfo.Title = ExtractTitle(body)
 			if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
@@ -87,22 +62,23 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 				httpInfo.TlsDNS = resp.TLS.PeerCertificates[0].DNSNames
 			}
 			// finger
-			err = webfinger.ParseWebFingerData(webfinger.DefFingerData)
-			if err == nil {
-				resp.Body = io.NopCloser(bytes.NewReader(body))
-				httpInfo.Fingers = webfinger.WebFingerIdent(resp)
-				// favicon
-				fau := webfinger.FindFaviconUrl(string(body))
-				if fau != "" {
-					if !strings.HasPrefix(fau, "http") {
-						fau = resp.Request.URL.String() + fau
-					}
-					_, body2, err2 := getReq(fau)
-					if err2 == nil && len(body2) != 0 {
-						httpInfo.Fingers = append(httpInfo.Fingers, webfinger.WebFingerIdentByFavicon(body2)...)
-					}
+			if len(webfinger.WebFingers) == 0 {
+				err = webfinger.ParseWebFingerData(webfinger.DefFingerData)
+			}
+			resp.Body = io.NopCloser(bytes.NewReader(body))
+			httpInfo.Fingers = webfinger.WebFingerIdent(resp)
+			// favicon
+			fau := webfinger.FindFaviconUrl(string(body))
+			if fau != "" {
+				if !strings.HasPrefix(fau, "http") {
+					fau = resp.Request.URL.String() + fau
+				}
+				_, body2, err2 := getReq(fau, 3)
+				if err2 == nil && len(body2) != 0 {
+					httpInfo.Fingers = append(httpInfo.Fingers, webfinger.WebFingerIdentByFavicon(body2)...)
 				}
 			}
+
 			if resp.StatusCode != 400 {
 				break
 			}
@@ -112,28 +88,62 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 	return httpInfo, false
 }
 
-func getReq(url2 string) (resp *http.Response, body []byte, err error) {
-	req, err := http.NewRequest(http.MethodGet, url2, http.NoBody)
-	if err != nil {
-		return
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
-	req.Header.Set("Accept-Encoding", "gzip, deflate")
-	req.Close = true // disable keepalive
-	resp, err = httpClient.Do(req)
-	if err != nil {
-		return
-	}
-	if resp.Body != http.NoBody && resp.Body != nil {
-		body, _ = getBody(resp)
-		if contentTypes, _ := resp.Header["Content-Type"]; len(contentTypes) > 0 {
-			if strings.Contains(contentTypes[0], "text") {
-				_body, err2 := DecodeData(body, resp.Header)
-				if err2 == nil {
-					body = _body
-				}
-				resp.Body = io.NopCloser(bytes.NewReader(body))
+func getReq(url2 string, maxRewriteNum int) (resps []*http.Response, body []byte, err error) {
+	var rewriteNum int
+	var req *http.Request
+	for {
+		var resp *http.Response
+		req, err = http.NewRequest(http.MethodGet, url2, http.NoBody)
+		if err != nil {
+			return
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
+		req.Header.Set("Accept-Encoding", "gzip, deflate")
+		req.Close = true // disable keepalive
+		resp, err = httpClient.Do(req)
+		if err != nil {
+			if rewriteNum != 0 {
+				err = nil
 			}
+			return
+		}
+		resps = append(resps, resp)
+		if resp.Body != http.NoBody && resp.Body != nil {
+			body, _ = getBody(resp)
+			if contentTypes, _ := resp.Header["Content-Type"]; len(contentTypes) > 0 {
+				if strings.Contains(contentTypes[0], "text") {
+					_body, err2 := DecodeData(body, resp.Header)
+					if err2 == nil {
+						body = _body
+					}
+					resp.Body = io.NopCloser(bytes.NewReader(body))
+				}
+			}
+		}
+		if resp.ContentLength == -1 {
+			resp.ContentLength = int64(len(body))
+		}
+
+		var rewriteUrl string
+		rewriteUrl2, _ := resp.Location()
+		if rewriteUrl2 != nil {
+			rewriteUrl = rewriteUrl2.String()
+		} else {
+			rewriteUrl = GetLocation(body)
+		}
+		if rewriteUrl != "" && rewriteNum < maxRewriteNum {
+			if !strings.HasPrefix(rewriteUrl, "http") {
+				if strings.HasPrefix(rewriteUrl, "/") {
+					resp.Request.URL.Path = rewriteUrl
+				} else {
+					resp.Request.URL.Path = resp.Request.URL.Path[:strings.LastIndex(resp.Request.URL.Path, "/")+1] + rewriteUrl
+				}
+				rewriteUrl = resp.Request.URL.String()
+			}
+			url2 = rewriteUrl
+			rewriteNum++
+		} else {
+			break
 		}
 	}
 	return

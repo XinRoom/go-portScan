@@ -47,10 +47,7 @@ func newHttpClient(dialTimeout time.Duration) *http.Client {
 		Timeout:   3 * time.Second,
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 2 {
-				return errors.New("stopped after 2 redirects")
-			}
-			return nil
+			return http.ErrUseLastResponse
 		},
 	}
 }
