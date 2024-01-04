@@ -238,6 +238,18 @@ func init() {
 		},
 	}
 
+	// ice
+	serviceRules["ice"] = serviceRule{
+		Tls: false,
+		DataGroup: []ruleData{
+			{
+				ActionRecv,
+				[]byte("IceP\x01\x00\x01\x00\x03\x00\x0e\x00\x00\x00"),
+				nil,
+			},
+		},
+	}
+
 	// Db
 	// mysql
 	serviceRules["mysql"] = serviceRule{
