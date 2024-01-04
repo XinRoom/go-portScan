@@ -14,7 +14,8 @@ var (
 	reTitle       = regexp.MustCompile(`(?im)<\s*title.*>(.*?)<\s*/\s*title>`)
 	reContentType = regexp.MustCompile(`(?im)\s*charset="(.*?)"|charset=(.*?)"\s*`)
 	reRefresh     = regexp.MustCompile(`(?im)\s*content=['"]\d;url=['"](.*?)['"]`)
-	reReplace     = regexp.MustCompile(`(?im)window\.location\.replace\(['"](.*?)['"]\)`)
+	reReplace     = regexp.MustCompile(`(?im)location\.replace\([\w+ ]*?['"](.*?)['"][\w+ ]*?\)`)
+	reLocation    = regexp.MustCompile(`(?im)location\.href\W?=[\w+ ]*?['"](.*?)['"]`)
 )
 
 // ExtractTitle from a response
@@ -88,6 +89,12 @@ func GetLocation(body []byte) (location string) {
 	}
 	if location == "" {
 		for _, match := range reReplace.FindAllStringSubmatch(string(body), 1) {
+			location = match[1]
+			break
+		}
+	}
+	if location == "" {
+		for _, match := range reLocation.FindAllStringSubmatch(string(body), 1) {
 			location = match[1]
 			break
 		}

@@ -140,6 +140,9 @@ func getReq(url2 string, maxRewriteNum int) (resps []*http.Response, body []byte
 				}
 				rewriteUrl = resp.Request.URL.String()
 			}
+			if rewriteUrl == url2 {
+				break
+			}
 			url2 = rewriteUrl
 			rewriteNum++
 		} else {
