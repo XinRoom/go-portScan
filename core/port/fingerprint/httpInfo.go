@@ -7,6 +7,7 @@ import (
 	"github.com/XinRoom/go-portScan/core/port"
 	"github.com/XinRoom/go-portScan/core/port/fingerprint/webfinger"
 	"github.com/XinRoom/go-portScan/util"
+	"github.com/XinRoom/go-portScan/util/httputil"
 	"io"
 	"net"
 	"net/http"
@@ -21,7 +22,7 @@ var httpClient *http.Client
 func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, isDailErr bool) {
 
 	if httpClient == nil {
-		httpClient = newHttpClient(dialTimeout)
+		httpClient = httputil.NewHttpClient(dialTimeout)
 	}
 
 	var err error
@@ -109,7 +110,7 @@ func getReq(url2 string, maxRewriteNum int) (resps []*http.Response, body []byte
 		}
 		resps = append(resps, resp)
 		if resp.Body != http.NoBody && resp.Body != nil {
-			body, _ = getBody(resp)
+			body, _ = httputil.GetBody(resp)
 			if contentTypes, _ := resp.Header["Content-Type"]; len(contentTypes) > 0 {
 				if strings.Contains(contentTypes[0], "text") {
 					_body, err2 := DecodeData(body, resp.Header)

@@ -1,4 +1,4 @@
-package fingerprint
+package httputil
 
 import (
 	"compress/flate"
@@ -13,10 +13,9 @@ import (
 
 var ErrOverflow = errors.New("OverflowMax")
 
-type Options struct {
-}
+var DefHttpClient *http.Client
 
-func newHttpClient(dialTimeout time.Duration) *http.Client {
+func NewHttpClient(dialTimeout time.Duration) *http.Client {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
@@ -52,8 +51,8 @@ func newHttpClient(dialTimeout time.Duration) *http.Client {
 	}
 }
 
-// getBody 识别响应Body的编码，读取body数据
-func getBody(resp *http.Response) (body []byte, err error) {
+// GetBody 识别响应Body的编码，读取body数据
+func GetBody(resp *http.Response) (body []byte, err error) {
 	if resp.Body == nil || resp.Body == http.NoBody {
 		return
 	}
