@@ -19,7 +19,7 @@ var httpsTopPort = []uint16{443, 4443, 1443, 8443}
 
 var httpClient *http.Client
 
-func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, isDailErr bool) {
+func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
 
 	if httpClient == nil {
 		httpClient = httputil.NewHttpClient(dialTimeout)
@@ -36,17 +36,24 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 		schemes = []string{"http", "https"}
 	}
 
+	var b bytes.Buffer
+	defer b.Reset()
+
 	for _, scheme := range schemes {
 		url2 := fmt.Sprintf("%s://%s:%d/", scheme, ip.String(), _port)
 		resps, body, err = getReq(url2, 3)
 		if err != nil {
 			if strings.HasSuffix(err.Error(), ioTimeoutStr) || strings.Contains(err.Error(), refusedStr) {
-				return nil, true
+				return nil, banner, true
 			}
 			continue
 		}
 		if len(resps) > 0 {
 			resp := resps[len(resps)-1]
+			b.Reset()
+			resp.Write(&b)
+			b.Write(body)
+			banner = b.Bytes()
 			//
 			httpInfo = new(port.HttpInfo)
 			httpInfo.Url = resp.Request.URL.String()
@@ -86,7 +93,7 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 		}
 	}
 
-	return httpInfo, false
+	return httpInfo, banner, false
 }
 
 func getReq(url2 string, maxRewriteNum int) (resps []*http.Response, body []byte, err error) {

@@ -73,7 +73,7 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 			}
 		}
 		if ts.option.Httpx && (openIpPort.Service == "" || openIpPort.Service == "http" || openIpPort.Service == "https") {
-			openIpPort.HttpInfo, isDailErr = fingerprint.ProbeHttpInfo(ip, dst, 2*time.Second)
+			openIpPort.HttpInfo, openIpPort.Banner, isDailErr = fingerprint.ProbeHttpInfo(ip, dst, 2*time.Second)
 			if isDailErr {
 				return
 			}
