@@ -52,7 +52,6 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 			resp := resps[len(resps)-1]
 			b.Reset()
 			resp.Write(&b)
-			b.Write(body)
 			banner = b.Bytes()
 			//
 			httpInfo = new(port.HttpInfo)
