@@ -169,6 +169,9 @@ func (hi *HttpInfo) String() string {
 
 // ParsePortRangeStr 解析端口字符串
 func ParsePortRangeStr(portStr string) (out [][]uint16, err error) {
+	if portStr == "-" {
+		portStr = "1-65535"
+	}
 	portsStrGroup := strings.Split(portStr, ",")
 	var portsStrGroup3 []string
 	var portStart, portEnd uint64
