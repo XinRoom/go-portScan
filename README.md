@@ -176,7 +176,23 @@ func main() {
 }
 ```
 
-### 3. For More
+### 3. Http/Port Finger
+Http Web Cms Finger
+```go
+// "github.com/XinRoom/go-portScan/core/port/fingerprint"
+func ProbeHttpInfo(net.ParseIP("1.1.1.1"), 443, 5*time.Second) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool)
+
+// "github.com/XinRoom/go-portScan/core/port/fingerprint/webfinger"
+func WebFingerIdent(resp *http.Response) (names []string)
+```
+Tcp Port Service Finger
+
+```go
+// "github.com/XinRoom/go-portScan/core/port/fingerprint"
+func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Duration) (serviceName string, banner []byte, isDailErr bool)
+```
+
+### 4. For More
 
 To see [./cmd/go-portScan.go](./cmd/go-portScan.go)
 
