@@ -20,14 +20,6 @@ var httpsTopPort = []uint16{443, 4443, 1443, 8443}
 var httpClient *http.Client
 
 func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
-
-	if httpClient == nil {
-		httpClient = httputil.NewHttpClient(dialTimeout)
-	}
-
-	var err error
-	var body []byte
-	var resps []*http.Response
 	var schemes []string
 
 	if util.IsUint16InList(_port, httpsTopPort) {
@@ -36,63 +28,81 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 		schemes = []string{"http", "https"}
 	}
 
-	var b bytes.Buffer
-	defer b.Reset()
+	var url2 string
 
 	for _, scheme := range schemes {
-		url2 := fmt.Sprintf("%s://%s:%d/", scheme, ip.String(), _port)
-		resps, body, err = getReq(url2, 3)
-		if err != nil {
-			if strings.HasSuffix(err.Error(), ioTimeoutStr) || strings.Contains(err.Error(), refusedStr) {
-				return nil, banner, true
-			}
-			continue
-		}
-		if len(resps) > 0 {
-			resp := resps[len(resps)-1]
-			b.Reset()
-			resp.Write(&b)
-			banner = b.Bytes()
-			//
-			httpInfo = new(port.HttpInfo)
-			httpInfo.Url = resp.Request.URL.String()
-			httpInfo.StatusCode = resp.StatusCode
-			httpInfo.ContentLen = int(resp.ContentLength)
-			rewriteUrl, err := resp.Location()
-			if err == nil {
-				httpInfo.Location = rewriteUrl.String()
-			}
-			httpInfo.Server = resp.Header.Get("Server")
-			httpInfo.Title = ExtractTitle(body)
-			if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
-				httpInfo.TlsCN = resp.TLS.PeerCertificates[0].Subject.CommonName
-				httpInfo.TlsDNS = resp.TLS.PeerCertificates[0].DNSNames
-			}
-			// finger
-			if len(webfinger.WebFingers) == 0 {
-				err = webfinger.ParseWebFingerData(webfinger.DefFingerData)
-			}
-			resp.Body = io.NopCloser(bytes.NewReader(body))
-			httpInfo.Fingers = webfinger.WebFingerIdent(resp)
-			// favicon
-			fau := webfinger.FindFaviconUrl(string(body))
-			if fau != "" {
-				if !strings.HasPrefix(fau, "http") {
-					fau = resp.Request.URL.String() + fau
-				}
-				_, body2, err2 := getReq(fau, 3)
-				if err2 == nil && len(body2) != 0 {
-					httpInfo.Fingers = append(httpInfo.Fingers, webfinger.WebFingerIdentByFavicon(body2)...)
-				}
-			}
+		url2 = fmt.Sprintf("%s://%s:%d/", scheme, ip.String(), _port)
 
-			if resp.StatusCode != 400 {
-				break
-			}
+		httpInfo, banner, isDailErr = WebHttpInfo(url2, dialTimeout)
+		if isDailErr {
+			return
+		}
+
+		if httpInfo != nil && httpInfo.StatusCode != 400 {
+			break
 		}
 	}
 
-	return httpInfo, banner, false
+	return
+}
+
+func WebHttpInfo(url2 string, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
+	if httpClient == nil {
+		httpClient = httputil.NewHttpClient(dialTimeout)
+	}
+
+	var err error
+	var body []byte
+	var resps []*http.Response
+
+	var b bytes.Buffer
+	defer b.Reset()
+
+	resps, body, err = getReq(url2, 3)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "timeout") || strings.Contains(err.Error(), refusedStr) {
+			return nil, banner, true
+		}
+	}
+	if len(resps) > 0 {
+		resp := resps[len(resps)-1]
+		b.Reset()
+		resp.Write(&b)
+		banner = b.Bytes()
+		//
+		httpInfo = new(port.HttpInfo)
+		httpInfo.Url = resp.Request.URL.String()
+		httpInfo.StatusCode = resp.StatusCode
+		httpInfo.ContentLen = int(resp.ContentLength)
+		rewriteUrl, err := resp.Location()
+		if err == nil {
+			httpInfo.Location = rewriteUrl.String()
+		}
+		httpInfo.Server = resp.Header.Get("Server")
+		httpInfo.Title = ExtractTitle(body)
+		if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
+			httpInfo.TlsCN = resp.TLS.PeerCertificates[0].Subject.CommonName
+			httpInfo.TlsDNS = resp.TLS.PeerCertificates[0].DNSNames
+		}
+		// finger
+		if len(webfinger.WebFingers) == 0 {
+			err = webfinger.ParseWebFingerData(webfinger.DefFingerData)
+		}
+		resp.Body = io.NopCloser(bytes.NewReader(body))
+		httpInfo.Fingers = webfinger.WebFingerIdent(resp)
+		// favicon
+		fau := webfinger.FindFaviconUrl(string(body))
+		if fau != "" {
+			if !strings.HasPrefix(fau, "http") {
+				fau = resp.Request.URL.String() + fau
+			}
+			_, body2, err2 := getReq(fau, 3)
+			if err2 == nil && len(body2) != 0 {
+				httpInfo.Fingers = append(httpInfo.Fingers, webfinger.WebFingerIdentByFavicon(body2)...)
+			}
+		}
+	}
+	return
 }
 
 func getReq(url2 string, maxRewriteNum int) (resps []*http.Response, body []byte, err error) {
