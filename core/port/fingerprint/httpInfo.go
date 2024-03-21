@@ -9,7 +9,6 @@ import (
 	"github.com/XinRoom/go-portScan/util"
 	"github.com/XinRoom/go-portScan/util/httputil"
 	"io"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -19,7 +18,7 @@ var httpsTopPort = []uint16{443, 4443, 1443, 8443}
 
 var httpClient *http.Client
 
-func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
+func ProbeHttpInfo(host string, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
 	var schemes []string
 
 	if util.IsUint16InList(_port, httpsTopPort) {
@@ -31,7 +30,7 @@ func ProbeHttpInfo(ip net.IP, _port uint16, dialTimeout time.Duration) (httpInfo
 	var url2 string
 
 	for _, scheme := range schemes {
-		url2 = fmt.Sprintf("%s://%s:%d/", scheme, ip.String(), _port)
+		url2 = fmt.Sprintf("%s://%s:%d/", scheme, host, _port)
 
 		httpInfo, banner, isDailErr = WebHttpInfo(url2, dialTimeout)
 		if isDailErr {
