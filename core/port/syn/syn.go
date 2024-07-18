@@ -147,12 +147,12 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 	}
 
 	// 与recv协同，当队列缓冲区到达80%时降半速，90%将为1/s
-	if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*8 {
+	if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*9 {
+		ss.limiter.SetLimit(1)
+	} else if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*8 {
 		if ss.option.Rate/2 != 0 {
 			ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(ss.option.Rate/2)))
 		}
-	} else if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*9 {
-		ss.limiter.SetLimit(1)
 	} else {
 		ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(ss.option.Rate)))
 	}
