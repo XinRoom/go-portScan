@@ -47,6 +47,10 @@ type SynScanner struct {
 	watchIpStatusT *watchIpStatusTable // IpStatusCacheTable
 	watchMacCacheT *watchMacCacheTable // MacCaches
 	isDone         bool
+
+	// stat
+	lastStatProbeTime time.Time
+	lastRate          int
 }
 
 // NewSynScanner firstIp: Used to select routes; openPortChan: Result return channel
@@ -146,16 +150,7 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 		return io.EOF
 	}
 
-	// 与recv协同，当队列缓冲区到达80%时降半速，90%将为1/s
-	if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*9 {
-		ss.limiter.SetLimit(1)
-	} else if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*8 {
-		if ss.option.Rate/2 != 0 {
-			ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(ss.option.Rate/2)))
-		}
-	} else {
-		ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(ss.option.Rate)))
-	}
+	ss.changeLimiter()
 
 	dstIp = dstIp.To4()
 	if dstIp == nil {
@@ -308,6 +303,43 @@ func (ss *SynScanner) WaitLimiter() error {
 // GetDevName Get the device name after the route selection
 func (ss *SynScanner) GetDevName() string {
 	return ss.devName
+}
+
+// changeLimiter
+func (ss *SynScanner) changeLimiter() {
+	// 忽略第一次执行
+	if ss.lastStatProbeTime.Equal(time.Time{}) {
+		ss.lastRate = ss.option.Rate
+		ss.lastStatProbeTime = time.Now()
+		return
+	}
+	// 每 2s 判断一次
+	if time.Since(ss.lastStatProbeTime) < 2*time.Second {
+		return
+	}
+	ss.lastStatProbeTime = time.Now()
+
+	var setLimit = func(rate int) {
+		if rate <= 0 {
+			rate = 10
+		}
+		if rate > ss.option.Rate {
+			rate = ss.option.Rate
+		}
+		ss.lastRate = rate
+		ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(rate)))
+	}
+
+	// 与recv协同，当队列缓冲区到达80%时降半速，90%将为10/s
+	if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*9 {
+		setLimit(10)
+	} else if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*8 {
+		setLimit(ss.lastRate / 2)
+	} else if ss.limiter.Tokens() > 0 { // 通过判断limiter是否还有可使用Tokens，判断发送速度是否是贴着网卡最大发送速度，理想情况下应该为网卡最大处理速度小一点
+		setLimit(ss.lastRate - int(ss.limiter.Tokens()) - 10)
+	} else if ss.limiter.Tokens() < -50 { // 恢复速度到使端口发包等待30个组(tokens 会为负数)
+		setLimit(ss.lastRate - int(ss.limiter.Tokens()) - 10)
+	}
 }
 
 func (ss *SynScanner) portProbeHandle() {
