@@ -92,7 +92,7 @@ var TopTcpPorts = []uint16{
 type Scanner interface {
 	Close()
 	Wait()
-	Scan(ip net.IP, dst uint16) error
+	Scan(ip net.IP, dst uint16, ipOption IpOption) error
 	WaitLimiter() error
 }
 
@@ -103,6 +103,7 @@ type OpenIpPort struct {
 	Service  string
 	Banner   []byte
 	HttpInfo *HttpInfo
+	IpOption
 }
 
 func (op OpenIpPort) String() string {
@@ -121,13 +122,19 @@ func (op OpenIpPort) String() string {
 	return buf.String()
 }
 
-// Option ...
-type Option struct {
-	Rate        int    // 每秒速度限制, 单位: s, 会在1s内平均发送, 相当于每个包之间的延迟
-	Timeout     int    // TCP连接响应延迟, 单位: ms
-	NextHop     string // pcap dev name
-	FingerPrint bool   // 服务探测
-	Httpx       bool   // HttpInfo 探测
+// ScannerOption 扫描器初始化参数
+type ScannerOption struct {
+	Rate    int    // 每秒速度限制, 单位: s, 会在1s内平均发送, 相当于每个包之间的延迟
+	Timeout int    // TCP连接响应延迟, 单位: ms
+	NextHop string // pcap dev name
+	Debug   bool
+}
+
+// IpOption 对开放端口进一步处理参数
+type IpOption struct {
+	FingerPrint bool        // 探测服务
+	Httpx       bool        // 探测 HttpInfo
+	Ext         interface{} // 扩展属性
 }
 
 // HttpInfo Http服务基础信息

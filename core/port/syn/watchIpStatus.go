@@ -3,6 +3,7 @@
 package syn
 
 import (
+	"github.com/XinRoom/go-portScan/core/port"
 	"sync"
 	"time"
 )
@@ -10,6 +11,7 @@ import (
 type watchIpStatus struct {
 	ReceivedPort map[uint16]struct{}
 	LastTime     time.Time
+	IpOption     port.IpOption
 }
 
 // IP状态更新表
@@ -27,15 +29,15 @@ func newWatchIpStatusTable(timeout time.Duration) (w *watchIpStatusTable) {
 	return
 }
 
-// UpdateLastTime 新建或者更新LastTime
-func (w *watchIpStatusTable) UpdateLastTime(ip string) {
+// CreateOrUpdateLastTime 新建或者更新LastTime
+func (w *watchIpStatusTable) CreateOrUpdateLastTime(ip string, ipOption port.IpOption) {
 	lastTime := time.Now()
 	w.lock.Lock()
 	wi, ok := w.watchIpS[ip]
 	if ok {
 		wi.LastTime = lastTime
 	} else {
-		w.watchIpS[ip] = &watchIpStatus{LastTime: lastTime, ReceivedPort: make(map[uint16]struct{})}
+		w.watchIpS[ip] = &watchIpStatus{LastTime: lastTime, ReceivedPort: make(map[uint16]struct{}), IpOption: ipOption}
 	}
 	w.lock.Unlock()
 }
@@ -61,10 +63,13 @@ func (w *watchIpStatusTable) HasPort(ip string, port uint16) (has bool) {
 	return
 }
 
-// HasIp 判断是否在监视对应IP
-func (w *watchIpStatusTable) HasIp(ip string) (has bool) {
+// GetIpOption 判断是否在监视对应IP
+func (w *watchIpStatusTable) GetIpOption(ip string) (ipOption port.IpOption, has bool) {
 	w.lock.RLock()
-	_, has = w.watchIpS[ip]
+	wi, has := w.watchIpS[ip]
+	if has {
+		ipOption = wi.IpOption
+	}
 	w.lock.RUnlock()
 	return
 }

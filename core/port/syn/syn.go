@@ -38,7 +38,7 @@ type SynScanner struct {
 	bufPool *sync.Pool
 
 	//
-	option         port.Option
+	option         port.ScannerOption
 	openPortChan   chan port.OpenIpPort // inside chan
 	portProbeWg    sync.WaitGroup
 	retChan        chan port.OpenIpPort // results chan
@@ -54,7 +54,7 @@ type SynScanner struct {
 }
 
 // NewSynScanner firstIp: Used to select routes; openPortChan: Result return channel
-func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Option) (ss *SynScanner, err error) {
+func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.ScannerOption) (ss *SynScanner, err error) {
 	// option verify
 	if option.Rate < 10 {
 		err = errors.New("rate can not set < 10")
@@ -106,17 +106,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 		watchIpStatusT: newWatchIpStatusTable(time.Duration(option.Timeout)),
 		watchMacCacheT: newWatchMacCacheTable(),
 	}
-	if ss.option.FingerPrint || ss.option.Httpx {
-		go ss.portProbeHandle()
-	} else {
-		go func() {
-			for t := range ss.openPortChan {
-				ss.portProbeWg.Add(1)
-				ss.retChan <- t
-				ss.portProbeWg.Done()
-			}
-		}()
-	}
+	go ss.portProbeHandle()
 
 	// Pcap
 	// 每个包最大读取长度1024, 不开启混杂模式, no TimeOut
@@ -145,7 +135,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Opt
 }
 
 // Scan scans the dst IP address and port of this scanner.
-func (ss *SynScanner) Scan(dstIp net.IP, dst uint16) (err error) {
+func (ss *SynScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) (err error) {
 	if ss.isDone {
 		return io.EOF
 	}
@@ -159,7 +149,7 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16) (err error) {
 
 	// watchIp, first
 	ipStr := dstIp.String()
-	ss.watchIpStatusT.UpdateLastTime(ipStr)
+	ss.watchIpStatusT.CreateOrUpdateLastTime(ipStr, ipOption)
 
 	// First off, get the MAC address we should be sending packets to.
 	var dstMac net.HardwareAddr
@@ -319,6 +309,10 @@ func (ss *SynScanner) changeLimiter() {
 	}
 	ss.lastStatProbeTime = time.Now()
 
+	if ss.option.Debug {
+		fmt.Println("[d] limiter tokens:", ss.limiter.Tokens())
+	}
+
 	var setLimit = func(rate int) {
 		if rate <= 0 {
 			rate = 10
@@ -327,6 +321,9 @@ func (ss *SynScanner) changeLimiter() {
 			rate = ss.option.Rate
 		}
 		ss.lastRate = rate
+		if ss.option.Debug {
+			fmt.Sprintf("[d] syn rate:%d packets/s\n", rate)
+		}
 		ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(rate)))
 	}
 
@@ -345,27 +342,32 @@ func (ss *SynScanner) changeLimiter() {
 func (ss *SynScanner) portProbeHandle() {
 	for openIpPort := range ss.openPortChan {
 		ss.portProbeWg.Add(1)
-		go func(_openIpPort port.OpenIpPort) {
-			if _openIpPort.Port != 0 {
-				if ss.option.FingerPrint {
-					ss.WaitLimiter()
-					_openIpPort.Service, _openIpPort.Banner, _ = fingerprint.PortIdentify("tcp", _openIpPort.Ip, _openIpPort.Port, 2*time.Second)
-				}
-				if ss.option.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
-					ss.WaitLimiter()
-					_openIpPort.HttpInfo, _openIpPort.Banner, _ = fingerprint.ProbeHttpInfo(_openIpPort.Ip.String(), _openIpPort.Port, 2*time.Second)
-					if _openIpPort.HttpInfo != nil {
-						if strings.HasPrefix(_openIpPort.HttpInfo.Url, "https") {
-							_openIpPort.Service = "https"
-						} else {
-							_openIpPort.Service = "http"
+		if !openIpPort.FingerPrint && !openIpPort.Httpx {
+			ss.retChan <- openIpPort
+			ss.portProbeWg.Done()
+		} else {
+			go func(_openIpPort port.OpenIpPort) {
+				if _openIpPort.Port != 0 {
+					if _openIpPort.FingerPrint {
+						ss.WaitLimiter()
+						_openIpPort.Service, _openIpPort.Banner, _ = fingerprint.PortIdentify("tcp", _openIpPort.Ip, _openIpPort.Port, 2*time.Second)
+					}
+					if _openIpPort.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
+						ss.WaitLimiter()
+						_openIpPort.HttpInfo, _openIpPort.Banner, _ = fingerprint.ProbeHttpInfo(_openIpPort.Ip.String(), _openIpPort.Port, 2*time.Second)
+						if _openIpPort.HttpInfo != nil {
+							if strings.HasPrefix(_openIpPort.HttpInfo.Url, "https") {
+								_openIpPort.Service = "https"
+							} else {
+								_openIpPort.Service = "http"
+							}
 						}
 					}
 				}
-			}
-			ss.retChan <- _openIpPort
-			ss.portProbeWg.Done()
-		}(openIpPort)
+				ss.retChan <- _openIpPort
+				ss.portProbeWg.Done()
+			}(openIpPort)
+		}
 	}
 }
 
@@ -527,7 +529,8 @@ func (ss *SynScanner) recv() {
 		if tcpLayer.DstPort != 0 && tcpLayer.DstPort >= 49000 && tcpLayer.DstPort <= 59000 {
 			ipStr = ipLayer.SrcIP.String()
 			_port = uint16(tcpLayer.SrcPort)
-			if !ss.watchIpStatusT.HasIp(ipStr) { // IP
+			ipOption, has := ss.watchIpStatusT.GetIpOption(ipStr)
+			if !has { // IP
 				continue
 			} else {
 				if ss.watchIpStatusT.HasPort(ipStr, _port) { // PORT
@@ -539,8 +542,9 @@ func (ss *SynScanner) recv() {
 
 			if tcpLayer.SYN && tcpLayer.ACK {
 				ss.openPortChan <- port.OpenIpPort{
-					Ip:   ipLayer.SrcIP,
-					Port: _port,
+					Ip:       ipLayer.SrcIP,
+					Port:     _port,
+					IpOption: ipOption,
 				}
 				// reply to target
 				eth.DstMAC = ethLayer.SrcMAC

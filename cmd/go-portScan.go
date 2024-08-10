@@ -41,6 +41,7 @@ var (
 	maxOpenPort int
 	oCsv        string
 	oFile       string
+	debug       bool
 )
 
 func parseFlag(c *cli.Context) {
@@ -62,6 +63,7 @@ func parseFlag(c *cli.Context) {
 	maxOpenPort = c.Int("maxOpenPort")
 	oCsv = c.String("oCsv")
 	oFile = c.String("oFile")
+	debug = c.Bool("debug")
 }
 
 func run(c *cli.Context) error {
@@ -217,10 +219,13 @@ func run(c *cli.Context) error {
 
 	// Initialize the Scanner
 	var s port.Scanner
-	option := port.Option{
-		Rate:        rate,
-		Timeout:     timeout,
-		NextHop:     nexthop,
+	option := port.ScannerOption{
+		Rate:    rate,
+		Timeout: timeout,
+		NextHop: nexthop,
+		Debug:   debug,
+	}
+	ipOption := port.IpOption{
 		FingerPrint: sV,
 		Httpx:       httpx,
 	}
@@ -271,7 +276,7 @@ func run(c *cli.Context) error {
 					break
 				}
 			}
-			s.Scan(ip, _port)
+			s.Scan(ip, _port, ipOption)
 		}
 		if maxOpenPort > 0 {
 			ipPortNumRW.Lock()
@@ -440,6 +445,11 @@ func main() {
 			&cli.BoolFlag{
 				Name:  "nohup",
 				Usage: "nohup",
+				Value: false,
+			},
+			&cli.BoolFlag{
+				Name:  "debug",
+				Usage: "debug",
 				Value: false,
 			},
 		},

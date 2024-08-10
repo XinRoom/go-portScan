@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var DefaultTcpOption = port.Option{
+var DefaultTcpOption = port.ScannerOption{
 	Rate:    1000,
 	Timeout: 800,
 }
@@ -25,12 +25,12 @@ type TcpScanner struct {
 	ctx     context.Context
 	timeout time.Duration
 	isDone  bool
-	option  port.Option
+	option  port.ScannerOption
 	wg      sync.WaitGroup
 }
 
 // NewTcpScanner Tcp扫描器
-func NewTcpScanner(retChan chan port.OpenIpPort, option port.Option) (ts *TcpScanner, err error) {
+func NewTcpScanner(retChan chan port.OpenIpPort, option port.ScannerOption) (ts *TcpScanner, err error) {
 	// option verify
 	if option.Rate < 10 {
 		err = errors.New("rate can not set < 10")
@@ -53,7 +53,7 @@ func NewTcpScanner(retChan chan port.OpenIpPort, option port.Option) (ts *TcpSca
 }
 
 // Scan 对指定IP和dis port进行扫描
-func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
+func (ts *TcpScanner) Scan(ip net.IP, dst uint16, ipOption port.IpOption) error {
 	if ts.isDone {
 		return errors.New("scanner is closed")
 	}
@@ -64,15 +64,18 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 		openIpPort := port.OpenIpPort{
 			Ip:   ip,
 			Port: dst,
+			IpOption: port.IpOption{
+				Ext: ipOption.Ext,
+			},
 		}
 		var isDailErr bool
-		if ts.option.FingerPrint {
+		if ipOption.FingerPrint {
 			openIpPort.Service, openIpPort.Banner, isDailErr = fingerprint.PortIdentify("tcp", ip, dst, 2*time.Second)
 			if isDailErr {
 				return
 			}
 		}
-		if ts.option.Httpx && (openIpPort.Service == "" || openIpPort.Service == "http" || openIpPort.Service == "https") {
+		if ipOption.Httpx && (openIpPort.Service == "" || openIpPort.Service == "http" || openIpPort.Service == "https") {
 			openIpPort.HttpInfo, openIpPort.Banner, isDailErr = fingerprint.ProbeHttpInfo(ip.String(), dst, 2*time.Second)
 			if isDailErr {
 				return
@@ -85,7 +88,7 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16) error {
 				}
 			}
 		}
-		if !ts.option.FingerPrint && !ts.option.Httpx {
+		if !ipOption.FingerPrint && !ipOption.Httpx {
 			conn, _ := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, dst), ts.timeout)
 			if conn != nil {
 				conn.Close()

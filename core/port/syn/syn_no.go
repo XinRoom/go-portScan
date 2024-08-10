@@ -11,11 +11,11 @@ type synScanner struct {
 }
 
 // NewSynScanner firstIp: Used to select routes; openPortChan: Result return channel
-func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Option) (ss *synScanner, err error) {
+func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.ScannerOption) (ss *synScanner, err error) {
 	return nil, ErrorNoSyn
 }
 
-func (ss *synScanner) Scan(dstIp net.IP, dst uint16) error {
+func (ss *synScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) error {
 	return nil
 }
 func (ss *synScanner) WaitLimiter() error {

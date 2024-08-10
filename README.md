@@ -70,7 +70,7 @@ func main() {
 	portScan := func(ip net.IP) {
 		for _, _port := range ports { // port
 			ss.WaitLimiter()
-			ss.Scan(ip, _port) // syn 不能并发，默认以网卡和驱动最高性能发包
+			ss.Scan(ip, _port, port.IpOption{}) // syn 不能并发，默认以网卡和驱动最高性能发包
 		}
 	}
 
@@ -146,7 +146,7 @@ func main() {
 	portScan := func(ip net.IP) {
 		for _, _port := range ports { // port
 			ss.WaitLimiter()
-			ss.Scan(ip, _port) // syn 不能并发，默认以网卡和驱动最高性能发包
+			ss.Scan(ip, _port, port.IpOption{}) // syn 不能并发，默认以网卡和驱动最高性能发包
 		}
 	}
 
