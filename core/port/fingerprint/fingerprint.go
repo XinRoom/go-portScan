@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/XinRoom/go-portScan/util/iputil"
 	"net"
 	"regexp"
 	"strconv"
@@ -82,7 +83,7 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 		defer func() {
 			readBufPool.Put(buf)
 		}()
-		address := fmt.Sprintf("%s:%d", ip, _port)
+		address := fmt.Sprintf("%s:%d", iputil.GetIpStr(ip), _port)
 		conn, _ = net.DialTimeout(network, address, dailTimeout)
 		if conn == nil {
 			return unknown, banner, true
@@ -171,7 +172,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 	var conn net.Conn
 	var connTls *tls.Conn
 
-	address := fmt.Sprintf("%s:%d", ip, _port)
+	address := fmt.Sprintf("%s:%d", iputil.GetIpStr(ip), _port)
 
 	serviceRule2 := serviceRules[serviceName]
 	flowsService := groupFlows[serviceName]

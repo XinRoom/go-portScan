@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/XinRoom/go-portScan/core/port"
 	"github.com/XinRoom/go-portScan/core/port/fingerprint"
+	"github.com/XinRoom/go-portScan/util/iputil"
 	limiter "golang.org/x/time/rate"
 	"net"
 	"strings"
@@ -76,7 +77,7 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16, ipOption port.IpOption) error 
 			}
 		}
 		if ipOption.Httpx && (openIpPort.Service == "" || openIpPort.Service == "http" || openIpPort.Service == "https") {
-			openIpPort.HttpInfo, openIpPort.Banner, isDailErr = fingerprint.ProbeHttpInfo(ip.String(), dst, 2*time.Second)
+			openIpPort.HttpInfo, openIpPort.Banner, isDailErr = fingerprint.ProbeHttpInfo(iputil.GetIpStr(ip), dst, 2*time.Second)
 			if isDailErr {
 				return
 			}
@@ -89,7 +90,7 @@ func (ts *TcpScanner) Scan(ip net.IP, dst uint16, ipOption port.IpOption) error 
 			}
 		}
 		if !ipOption.FingerPrint && !ipOption.Httpx {
-			conn, _ := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, dst), ts.timeout)
+			conn, _ := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", iputil.GetIpStr(ip), dst), ts.timeout)
 			if conn != nil {
 				conn.Close()
 			} else {

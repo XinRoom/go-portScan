@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/XinRoom/go-portScan/core/port"
 	"github.com/XinRoom/go-portScan/core/port/fingerprint"
+	"github.com/XinRoom/go-portScan/util/iputil"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -354,7 +355,7 @@ func (ss *SynScanner) portProbeHandle() {
 					}
 					if _openIpPort.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
 						ss.WaitLimiter()
-						_openIpPort.HttpInfo, _openIpPort.Banner, _ = fingerprint.ProbeHttpInfo(_openIpPort.Ip.String(), _openIpPort.Port, 2*time.Second)
+						_openIpPort.HttpInfo, _openIpPort.Banner, _ = fingerprint.ProbeHttpInfo(iputil.GetIpStr(_openIpPort.Ip), _openIpPort.Port, 2*time.Second)
 						if _openIpPort.HttpInfo != nil {
 							if strings.HasPrefix(_openIpPort.HttpInfo.Url, "https") {
 								_openIpPort.Service = "https"
