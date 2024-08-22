@@ -323,7 +323,7 @@ func (ss *SynScanner) changeLimiter() {
 		}
 		ss.lastRate = rate
 		if ss.option.Debug {
-			fmt.Sprintf("[d] syn rate:%d packets/s\n", rate)
+			fmt.Printf("[d] syn rate:%d packets/s\n", rate)
 		}
 		ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(rate)))
 	}
