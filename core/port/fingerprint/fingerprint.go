@@ -259,6 +259,15 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 		}
 	}
 
+	// 兜底数据匹配
+	if serviceNameRet == "" && len(banner) > 0 {
+		for serviceName, _regex := range doneRecvFinger {
+			if _regex.MatchString(convert2utf8(string(banner))) {
+				serviceNameRet = serviceName
+			}
+		}
+	}
+
 	return
 }
 

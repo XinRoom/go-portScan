@@ -16,6 +16,11 @@ var groupFlows = map[string][]string{
 	"http": {"redis", "memcached"},
 }
 
+// 每个接收到的数据，均进行一次匹配
+var doneRecvFinger = map[string]*regexp.Regexp{
+	"http": regexp.MustCompile(`^HTTP/\d\.\d \d{3} `),
+}
+
 var portServiceOrder = map[uint16][]string{
 	21:    {"ftp"},
 	22:    {"ssh"},
