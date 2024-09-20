@@ -94,6 +94,7 @@ func main() {
 	}
 
 	wgPing.Wait()
+	ss.Wait()
 	ss.Close()
 	<-single
 	log.Println(time.Since(start))
@@ -170,6 +171,7 @@ func main() {
 	}
 
 	wgPing.Wait()
+	ss.Wait()
 	ss.Close()
 	<-single
 	log.Println(time.Since(start))
