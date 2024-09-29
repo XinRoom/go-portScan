@@ -377,7 +377,7 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:  "sT",
-				Usage: "TCP-mode(support IPv4 and IPv6)",
+				Usage: "TCP-mode",
 				Value: false,
 			},
 			&cli.IntFlag{
@@ -388,7 +388,7 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:  "sS",
-				Usage: "Use SYN-mode(Only IPv4)",
+				Usage: "Use SYN-mode",
 				Value: true,
 			},
 			&cli.StringFlag{

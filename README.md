@@ -246,9 +246,9 @@ GLOBAL OPTIONS:
    --Pn                              no ping probe (default: false)
    --rateP value, --rp value         concurrent num when ping probe each ip (default: 300)
    --PT                              use TCP-PING mode (default: false)
-   --sT                              TCP-mode(support IPv4 and IPv6) (default: false)
+   --sT                              TCP-mode (default: false)
    --timeout value, --to value       TCP-mode SYN-mode timeout. unit is ms. (default: 800)
-   --sS                              Use SYN-mode(Only IPv4) (default: true)
+   --sS                              Use SYN-mode(default: true)
    --nexthop value, --nh value       specified nexthop gw add to pcap dev
    --rate value, -r value            number of packets sent per second. If set -1, TCP-mode is 1000, SYN-mode is 1500(SYN-mode is restricted by the network adapter, 2000=1M) (default: -1)
    --devices, --ld                   list devices name (default: false)
