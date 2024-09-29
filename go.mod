@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/XinRoom/iprange v1.1.5
-	github.com/denisenkom/go-mssqldb v0.12.3
 	github.com/go-ping/ping v1.1.0
 	github.com/google/gopacket v1.1.19
 	github.com/jackpal/gateway v1.0.7
