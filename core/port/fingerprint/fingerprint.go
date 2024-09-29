@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/XinRoom/go-portScan/util/iputil"
 	"net"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -188,6 +189,10 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 			if strings.HasSuffix(err.Error(), ioTimeoutStr) || strings.Contains(err.Error(), refusedStr) {
 				isDailErr = true
 				return
+			}
+			var oe *net.OpError
+			if errors.As(err, &oe) && oe.Op == "remote error" && reflect.TypeOf(oe.Err).Name() == "alert" {
+				serviceNameRet = "tls"
 			}
 			return
 		}
