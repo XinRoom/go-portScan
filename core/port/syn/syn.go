@@ -27,7 +27,7 @@ type SynScanner struct {
 	devName       string           // eth dev(pcap)
 
 	// gateway (if applicable), and source IP addresses to use.
-	gw, srcIp net.IP
+	srcIp, srcIp6 net.IP
 
 	// pcap
 	handle *pcap.Handle
@@ -63,17 +63,17 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Sca
 	}
 
 	var devName string
-	var srcIp net.IP
+	var srcIp, srcIp6 net.IP
 	var srcMac net.HardwareAddr
 	var gw net.IP
 
 	// specify dev
 	if option.NextHop != "" {
-		gw = net.ParseIP(option.NextHop).To4()
-		srcIp, srcMac, devName, err = GetMacByGw(gw)
+		gw = net.ParseIP(option.NextHop)
+		srcIp, srcIp6, srcMac, devName, err = GetMacByGw(gw)
 	} else {
 		// get router info
-		srcIp, srcMac, gw, devName, err = GetRouterV4(firstIp)
+		srcIp, srcIp6, srcMac, gw, devName, err = GetRouter(firstIp)
 	}
 	if err != nil {
 		return
@@ -92,6 +92,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Sca
 			ComputeChecksums: true,
 		},
 		srcIp:   srcIp,
+		srcIp6:  srcIp6,
 		srcMac:  srcMac,
 		devName: devName,
 		bufPool: &sync.Pool{
@@ -116,7 +117,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Sca
 		return
 	}
 	// Set filter, Reduce the number of monitoring packets
-	handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp[tcpflags] == tcp-syn|tcp-ack)", srcMac.String()))
+	handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp[tcpflags] == tcp-syn|tcp-ack || ((ip6[6] = 6) && (ip6[53] & 0x03 != 0)))", srcMac.String()))
 	ss.handle = handle
 
 	// start listen recv
@@ -125,7 +126,7 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Sca
 	if gw != nil {
 		// get gateway mac addr
 		var dstMac net.HardwareAddr
-		dstMac, err = ss.getHwAddrV4(gw)
+		dstMac, err = ss.getHwAddr(gw)
 		if err != nil {
 			return
 		}
@@ -143,11 +144,6 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) (er
 
 	ss.changeLimiter()
 
-	dstIp = dstIp.To4()
-	if dstIp == nil {
-		return errors.New("is not ipv4")
-	}
-
 	// watchIp, first
 	ipStr := dstIp.String()
 	ss.watchIpStatusT.CreateOrUpdateLastTime(ipStr, ipOption)
@@ -162,7 +158,7 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) (er
 		if mac != nil {
 			dstMac = mac
 		} else {
-			dstMac, err = ss.getHwAddrV4(dstIp)
+			dstMac, err = ss.getHwAddr(dstIp)
 			if err != nil {
 				return
 			}
@@ -175,15 +171,29 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) (er
 		DstMAC:       dstMac,
 		EthernetType: layers.EthernetTypeIPv4,
 	}
-	ip4 := layers.IPv4{
-		SrcIP:    ss.srcIp,
-		DstIP:    dstIp,
-		Version:  4,
-		TTL:      128,
-		Id:       uint16(40000 + rand.Intn(10000)),
-		Flags:    layers.IPv4DontFragment,
-		Protocol: layers.IPProtocolTCP,
+	var ip4 *layers.IPv4
+	var ip6 *layers.IPv6
+	if dstIp.To4() != nil {
+		ip4 = &layers.IPv4{
+			SrcIP:    ss.srcIp,
+			DstIP:    dstIp,
+			Version:  4,
+			TTL:      128,
+			Id:       uint16(40000 + rand.Intn(10000)),
+			Flags:    layers.IPv4DontFragment,
+			Protocol: layers.IPProtocolTCP,
+		}
+	} else {
+		eth.EthernetType = layers.EthernetTypeIPv6
+		ip6 = &layers.IPv6{
+			Version:    6,
+			NextHeader: layers.IPProtocolTCP,
+			HopLimit:   64,
+			SrcIP:      ss.srcIp6,
+			DstIP:      dstIp,
+		}
 	}
+
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(49000 + rand.Intn(10000)), // Random source port and used to determine recv dst port range
 		DstPort: layers.TCPPort(dst),
@@ -216,11 +226,14 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) (er
 			},
 		},
 	}
-	tcp.SetNetworkLayerForChecksum(&ip4)
-
 	// Send one packet per loop iteration until we've sent packets
-	ss.send(&eth, &ip4, &tcp)
-
+	if ip4 != nil {
+		tcp.SetNetworkLayerForChecksum(ip4)
+		ss.send(&eth, ip4, &tcp)
+	} else if ip6 != nil {
+		tcp.SetNetworkLayerForChecksum(ip6)
+		ss.send(&eth, ip6, &tcp)
+	}
 	return
 }
 
@@ -372,6 +385,14 @@ func (ss *SynScanner) portProbeHandle() {
 	}
 }
 
+func (ss *SynScanner) getHwAddr(arpDst net.IP) (mac net.HardwareAddr, err error) {
+	if arpDst.To4() != nil {
+		return ss.getHwAddrV4(arpDst)
+	} else {
+		return ss.getHwAddrV6(arpDst)
+	}
+}
+
 // getHwAddrV4 get the destination hardware address for our packets.
 func (ss *SynScanner) getHwAddrV4(arpDst net.IP) (mac net.HardwareAddr, err error) {
 	ipStr := arpDst.String()
@@ -425,6 +446,94 @@ func (ss *SynScanner) getHwAddrV4(arpDst net.IP) (mac net.HardwareAddr, err erro
 	}
 }
 
+// convertIPv6ToMac converts an IPv6 address that was generated via SLAAC
+// to the corresponding MAC address.
+func (ss *SynScanner) convertIPv6ToMac(ipv6 net.IP) (net.HardwareAddr, error) {
+	if !((ipv6[0] == 0xfe && (ipv6[1]&0xc0 == 0x80)) || // fe80::/10
+		(ipv6[0] == 0x20 && ipv6[1] == 0x02) || // 2002::/16
+		(ipv6[0] == 0xff)) { // ff00::/8
+		return nil, errors.New("no SLAAC adder")
+	}
+
+	// Extract the interface identifier from the last 8 bytes of the IPv6 address
+	interfaceIdentifier := ipv6[8:16]
+	if (interfaceIdentifier[0] & 0x02) != 0x02 {
+		return nil, errors.New("no SLAAC adder")
+	}
+
+	// Convert EUI-64 to MAC address
+	mac := make(net.HardwareAddr, 6)
+	copy(mac, interfaceIdentifier[:3])
+	copy(mac[3:], interfaceIdentifier[5:])
+
+	// Flip the U/L bit in the first octet of the MAC address
+	mac[0] = mac[0] ^ 0x02
+	return mac, nil
+}
+
+// getHwAddrV6 get the destination hardware address for our packets.
+func (ss *SynScanner) getHwAddrV6(arpDst net.IP) (mac net.HardwareAddr, err error) {
+	mac, err = ss.convertIPv6ToMac(arpDst)
+	if mac != nil {
+		return
+	}
+
+	ipStr := arpDst.String()
+	if ss.watchMacCacheT.IsNeedWatch(ipStr) {
+		return nil, errors.New("arp of this ip has been in monitoring")
+	}
+	ss.watchMacCacheT.UpdateLastTime(ipStr) // New one ip watch
+
+	eth := layers.Ethernet{
+		SrcMAC:       ss.srcMac,
+		DstMAC:       []byte{51, 51, 255, arpDst[2], arpDst[1], arpDst[0]},
+		EthernetType: layers.EthernetTypeIPv6,
+	}
+	ipv6 := layers.IPv6{
+		Version:    6,
+		NextHeader: layers.IPProtocolICMPv6,
+		HopLimit:   64,
+		SrcIP:      ss.srcIp,
+		DstIP:      arpDst,
+	}
+	icmpv6 := layers.ICMPv6{
+		TypeCode: layers.CreateICMPv6TypeCode(layers.ICMPv6TypeNeighborSolicitation, 0),
+	}
+	icmpv6Payload := layers.ICMPv6NeighborSolicitation{
+		TargetAddress: arpDst,
+		Options: []layers.ICMPv6Option{
+			{
+				Type: layers.ICMPv6OptSourceAddress,
+				Data: ss.srcMac,
+			},
+		},
+	}
+
+	icmpv6.SetNetworkLayerForChecksum(&ipv6)
+
+	//start := time.Now()
+	var retry int
+
+	for {
+		mac = ss.watchMacCacheT.GetMac(ipStr)
+		if mac != nil {
+			return mac, nil
+		}
+		// Wait 600 ms for an ARP reply.
+		//if time.Since(start) > time.Millisecond*600 {
+		//	return nil, errors.New("timeout getting ICMP V6 NA reply")
+		//}
+		retry += 1
+		if retry%25 == 0 {
+			if err = ss.send(&eth, &ipv6, &icmpv6, &icmpv6Payload); err != nil {
+				return nil, err
+			}
+		}
+
+		time.Sleep(time.Millisecond * 10)
+	}
+}
+
 // send sends the given layers as a single packet on the network.
 func (ss *SynScanner) send(l ...gopacket.SerializableLayer) error {
 	buf := ss.bufPool.Get().(gopacket.SerializeBuffer)
@@ -465,6 +574,13 @@ func (ss *SynScanner) recv() {
 		TTL:      64,
 		Protocol: layers.IPProtocolTCP,
 	}
+	ip6 := layers.IPv6{
+		SrcIP:      ss.srcIp,
+		DstIP:      []byte{},
+		Version:    6,
+		HopLimit:   64,
+		NextHeader: layers.IPProtocolTCP,
+	}
 	tcp := layers.TCP{
 		SrcPort: 0,
 		DstPort: 0,
@@ -475,6 +591,8 @@ func (ss *SynScanner) recv() {
 
 	// Decode
 	var ipLayer layers.IPv4
+	var ipv6Layer layers.IPv6
+	var ipv6IcmpNALayer layers.ICMPv6NeighborAdvertisement
 	var tcpLayer layers.TCP
 	var arpLayer layers.ARP
 	var ethLayer layers.Ethernet
@@ -485,8 +603,10 @@ func (ss *SynScanner) recv() {
 		layers.LayerTypeEthernet,
 		&ethLayer,
 		&ipLayer,
+		&ipv6Layer,
 		&tcpLayer,
 		&arpLayer,
+		&ipv6IcmpNALayer,
 	)
 
 	// global var
@@ -494,6 +614,7 @@ func (ss *SynScanner) recv() {
 	var data []byte
 	var ipStr string
 	var _port uint16
+	var disIp net.IP
 
 	for {
 		// Read in the next packet.
@@ -526,9 +647,28 @@ func (ss *SynScanner) recv() {
 			continue
 		}
 
+		// ipv6NA
+		if len(ipv6IcmpNALayer.Options) != 0 {
+			ipStr = net.IP(arpLayer.SourceProtAddress).String()
+			if ss.watchMacCacheT.IsNeedWatch(ipStr) {
+				ss.watchMacCacheT.SetMac(ipStr, arpLayer.SourceHwAddress)
+			}
+			ipv6IcmpNALayer.Options = []layers.ICMPv6Option{} // clean arp parse status
+			continue
+		}
+
+		if ethLayer.EthernetType == layers.EthernetTypeIPv6 {
+			disIp = ipv6Layer.SrcIP
+			ip6.DstIP = disIp
+			eth.EthernetType = layers.EthernetTypeIPv6
+		} else {
+			disIp = ipLayer.SrcIP
+			ip4.DstIP = disIp
+		}
+
 		// tcp Match ip and port
 		if tcpLayer.DstPort != 0 && tcpLayer.DstPort >= 49000 && tcpLayer.DstPort <= 59000 {
-			ipStr = ipLayer.SrcIP.String()
+			ipStr = disIp.String()
 			_port = uint16(tcpLayer.SrcPort)
 			ipOption, has := ss.watchIpStatusT.GetIpOption(ipStr)
 			if !has { // IP
@@ -543,20 +683,24 @@ func (ss *SynScanner) recv() {
 
 			if tcpLayer.SYN && tcpLayer.ACK {
 				ss.openPortChan <- port.OpenIpPort{
-					Ip:       ipLayer.SrcIP,
+					Ip:       disIp,
 					Port:     _port,
 					IpOption: ipOption,
 				}
 				// reply to target
 				eth.DstMAC = ethLayer.SrcMAC
-				ip4.DstIP = ipLayer.SrcIP
 				tcp.DstPort = tcpLayer.SrcPort
 				tcp.SrcPort = tcpLayer.DstPort
 				// RST && ACK
 				tcp.Ack = tcpLayer.Seq + 1
 				tcp.Seq = tcpLayer.Ack
-				tcp.SetNetworkLayerForChecksum(&ip4)
-				ss.send(&eth, &ip4, &tcp)
+				if ethLayer.EthernetType == layers.EthernetTypeIPv6 {
+					tcp.SetNetworkLayerForChecksum(&ip6)
+					ss.send(&eth, &ip6, &tcp)
+				} else {
+					tcp.SetNetworkLayerForChecksum(&ip4)
+					ss.send(&eth, &ip4, &tcp)
+				}
 			}
 			tcpLayer.DstPort = 0 // clean tcp parse status
 		}

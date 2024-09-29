@@ -37,7 +37,7 @@ func GetDevByIp(ip net.IP) (devName string, err error) {
 	}
 	for _, d := range devices {
 		for _, address := range d.Addresses {
-			_ip := address.IP.To4()
+			_ip := address.IP
 			if _ip != nil && _ip.IsGlobalUnicast() && _ip.Equal(ip) {
 				return d.Name, nil
 			}
@@ -47,76 +47,98 @@ func GetDevByIp(ip net.IP) (devName string, err error) {
 }
 
 // GetIfaceMac get interface mac addr by interface ip (use golang net)
-func GetIfaceMac(ifaceAddr net.IP) (src net.IP, mac net.HardwareAddr) {
+func GetIfaceMac(ifaceAddr net.IP) (src net.IP, src6 net.IP, mac net.HardwareAddr) {
 	interfaces, _ := net.Interfaces()
+	var s4 = ifaceAddr.To4() != nil
 	for _, iface := range interfaces {
+		var ip, ip6 net.IP
 		if addrs, err := iface.Addrs(); err == nil {
 			for _, addr := range addrs {
-				if addr.(*net.IPNet).Contains(ifaceAddr) {
-					return addr.(*net.IPNet).IP, iface.HardwareAddr
+				var ipNet = addr.(*net.IPNet)
+				if !ipNet.IP.IsGlobalUnicast() {
+					continue
 				}
+				if ipNet.IP.To4() != nil {
+					if !s4 {
+						ip = ipNet.IP.To4()
+					}
+				} else {
+					if s4 {
+						ip6 = ipNet.IP
+					}
+				}
+				if ipNet.Contains(ifaceAddr) {
+					if s4 {
+						ip = ipNet.IP.To4()
+					} else {
+						ip6 = ipNet.IP
+					}
+					mac = iface.HardwareAddr
+				}
+			}
+			if mac != nil {
+				src = ip
+				src6 = ip6
+				return
 			}
 		}
 	}
-	return nil, nil
+	return
 }
 
 // GetMacByGw get srcIp srcMac devname by gw
-func GetMacByGw(gw net.IP) (srcIp net.IP, srcMac net.HardwareAddr, devname string, err error) {
-	srcIp, srcMac = GetIfaceMac(gw)
-	if srcIp == nil {
+func GetMacByGw(gw net.IP) (srcIp net.IP, srcIp6 net.IP, srcMac net.HardwareAddr, devname string, err error) {
+	srcIp, srcIp6, srcMac = GetIfaceMac(gw)
+	if srcIp == nil && srcIp6 == nil {
 		err = errors.New("can not find this dev by gw")
 		return
 	}
-	srcIp = srcIp.To4()
-	devices, err := pcap.FindAllDevs()
-	if err != nil {
-		return
+	if srcIp != nil {
+		devname, err = GetDevByIp(srcIp)
+	} else {
+		devname, err = GetDevByIp(srcIp6)
 	}
-	for _, d := range devices {
-		if len(d.Addresses) > 0 && d.Addresses[0].IP.String() == srcIp.String() {
-			devname = d.Name
-			return
-		}
+	if err == nil {
+		return
 	}
 	err = errors.New("can not find this dev")
 	return
 }
 
-// GetRouterV4 get ipv6 router by dst ip
-func GetRouterV4(dst net.IP) (srcIp net.IP, srcMac net.HardwareAddr, gw net.IP, devName string, err error) {
+// GetRouter get ipv6 router by dst ip
+func GetRouter(dst net.IP) (srcIp net.IP, srcIp6 net.IP, srcMac net.HardwareAddr, gw net.IP, devName string, err error) {
 	// 同网段
-	srcIp, srcMac = GetIfaceMac(dst)
+	srcIp, srcIp6, srcMac = GetIfaceMac(dst)
 	if srcIp == nil {
 		var r routing.Router
 		r, err = netroute.New()
 		if err == nil {
-			var iface *net.Interface
-			iface, gw, srcIp, err = r.Route(dst)
+			var sip net.IP
+			_, gw, sip, err = r.Route(dst)
 			if err == nil {
-				if iface != nil {
-					srcMac = iface.HardwareAddr
-				} else {
-					_, srcMac = GetIfaceMac(srcIp)
-				}
+				srcIp, srcIp6, srcMac = GetIfaceMac(sip)
 			}
 		}
 		if err != nil || srcMac == nil {
 			// 取第一个默认路由
 			gw, err = gateway.DiscoverGateway()
 			if err == nil {
-				srcIp, srcMac = GetIfaceMac(gw)
+				srcIp, srcIp6, srcMac = GetIfaceMac(gw)
 			}
 		}
 	}
-	gw = gw.To4()
-	srcIp = srcIp.To4()
+	if gw.To4() != nil {
+		gw = gw.To4()
+	}
+	if srcIp.To4() != nil {
+		srcIp = srcIp.To4()
+	}
 	devName, err = GetDevByIp(srcIp)
-	if srcIp == nil || err != nil || srcMac == nil {
+	if (srcIp == nil && srcIp6 == nil) || err != nil || srcMac == nil {
 		if err == nil {
 			err = fmt.Errorf("err")
 		}
-		return nil, nil, nil, "", fmt.Errorf("no router, %s", err)
+		return nil, nil, nil, nil, "", fmt.Errorf("no router, %s", err)
 	}
 	return
 }
