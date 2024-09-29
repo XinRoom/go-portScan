@@ -486,7 +486,7 @@ func (ss *SynScanner) getHwAddrV6(arpDst net.IP) (mac net.HardwareAddr, err erro
 
 	eth := layers.Ethernet{
 		SrcMAC:       ss.srcMac,
-		DstMAC:       []byte{51, 51, 255, arpDst[2], arpDst[1], arpDst[0]},
+		DstMAC:       []byte{51, 51, 255, arpDst[13], arpDst[14], arpDst[15]},
 		EthernetType: layers.EthernetTypeIPv6,
 	}
 	ipv6 := layers.IPv6{
