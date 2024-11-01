@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 )
 
 // ref:https://github.com/EdgeSecurityTeam/EHole/blob/main/finger.json
@@ -25,6 +26,8 @@ type WebFinger struct {
 }
 
 var WebFingers []WebFinger
+
+var onceLoadFingers sync.Once
 
 //go:embed finger.json
 var DefFingerData []byte
@@ -52,6 +55,11 @@ func ParseWebFingerData(data []byte) error {
 
 // WebFingerIdent web系统指纹识别
 func WebFingerIdent(resp *http.Response) (names []string) {
+	onceLoadFingers.Do(func() {
+		if len(WebFingers) == 0 {
+			ParseWebFingerData(DefFingerData)
+		}
+	})
 	var dataMap = make(map[string]string)
 	body, _ := io.ReadAll(resp.Body)
 	dataMap["body"] = string(body)

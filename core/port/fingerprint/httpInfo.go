@@ -84,9 +84,6 @@ func WebHttpInfo(url2 string, dialTimeout time.Duration) (httpInfo *port.HttpInf
 			httpInfo.TlsDNS = resp.TLS.PeerCertificates[0].DNSNames
 		}
 		// finger
-		if len(webfinger.WebFingers) == 0 {
-			err = webfinger.ParseWebFingerData(webfinger.DefFingerData)
-		}
 		resp.Body = io.NopCloser(bytes.NewReader(body))
 		httpInfo.Fingers = webfinger.WebFingerIdent(resp)
 		// favicon
