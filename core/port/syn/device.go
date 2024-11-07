@@ -38,7 +38,7 @@ func GetDevByIp(ip net.IP) (devName string, err error) {
 	for _, d := range devices {
 		for _, address := range d.Addresses {
 			_ip := address.IP
-			if _ip != nil && _ip.IsGlobalUnicast() && _ip.Equal(ip) {
+			if _ip != nil && (_ip.IsLoopback() || _ip.IsGlobalUnicast()) && _ip.Equal(ip) {
 				return d.Name, nil
 			}
 		}
@@ -55,7 +55,7 @@ func GetIfaceMac(ifaceAddr net.IP) (src net.IP, src6 net.IP, mac net.HardwareAdd
 		if addrs, err := iface.Addrs(); err == nil {
 			for _, addr := range addrs {
 				var ipNet = addr.(*net.IPNet)
-				if !ipNet.IP.IsGlobalUnicast() {
+				if !ipNet.IP.IsLoopback() && !ipNet.IP.IsGlobalUnicast() {
 					continue
 				}
 				if ipNet.IP.To4() != nil {
@@ -86,6 +86,46 @@ func GetIfaceMac(ifaceAddr net.IP) (src net.IP, src6 net.IP, mac net.HardwareAdd
 	return
 }
 
+// IsLocalIP 判断是否是本地网卡IP地址
+func IsLocalIP(ifaceAddr net.IP) (src net.IP, src6 net.IP, ok bool) {
+	interfaces, _ := net.Interfaces()
+	var s4 = ifaceAddr.To4() != nil
+	for _, iface := range interfaces {
+		var ip, ip6 net.IP
+		if addrs, err := iface.Addrs(); err == nil {
+			for _, addr := range addrs {
+				var ipNet = addr.(*net.IPNet)
+				if !ipNet.IP.IsLoopback() && !ipNet.IP.IsGlobalUnicast() {
+					continue
+				}
+				if ipNet.IP.To4() != nil {
+					if !s4 {
+						ip = ipNet.IP.To4()
+					}
+				} else {
+					if s4 {
+						ip6 = ipNet.IP
+					}
+				}
+				if ipNet.IP.Equal(ifaceAddr) {
+					if s4 {
+						ip = ipNet.IP.To4()
+					} else {
+						ip6 = ipNet.IP
+					}
+					ok = true
+				}
+			}
+			if ok {
+				src = ip
+				src6 = ip6
+				return
+			}
+		}
+	}
+	return
+}
+
 // GetMacByGw get srcIp srcMac devname by gw
 func GetMacByGw(gw net.IP) (srcIp net.IP, srcIp6 net.IP, srcMac net.HardwareAddr, devname string, err error) {
 	srcIp, srcIp6, srcMac = GetIfaceMac(gw)
@@ -107,6 +147,12 @@ func GetMacByGw(gw net.IP) (srcIp net.IP, srcIp6 net.IP, srcMac net.HardwareAddr
 
 // GetRouter get ipv6 router by dst ip
 func GetRouter(dst net.IP) (srcIp net.IP, srcIp6 net.IP, srcMac net.HardwareAddr, gw net.IP, devName string, err error) {
+	// localIP
+	srcIp, srcIp6, ok := IsLocalIP(dst)
+	if ok {
+		devName, _ = GetDevByIp(net.IP{127, 0, 0, 1})
+		return
+	}
 	// 同网段
 	srcIp, srcIp6, srcMac = GetIfaceMac(dst)
 	if srcIp == nil {

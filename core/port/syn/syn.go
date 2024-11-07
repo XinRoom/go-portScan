@@ -117,7 +117,11 @@ func NewSynScanner(firstIp net.IP, retChan chan port.OpenIpPort, option port.Sca
 		return
 	}
 	// Set filter, Reduce the number of monitoring packets
-	handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp[tcpflags] == tcp-syn|tcp-ack || ((ip6[6] = 6) && (ip6[53] & 0x03 != 0)))", srcMac.String()))
+	if ss.srcMac != nil {
+		handle.SetBPFFilter(fmt.Sprintf("ether dst %s && (arp || tcp[tcpflags] == tcp-syn|tcp-ack || ((ip6[6] = 6) && (ip6[53] & 0x03 != 0)))", srcMac.String()))
+	} else {
+		handle.SetBPFFilter("tcp[tcpflags] == tcp-syn|tcp-ack || ((ip6[6] = 6) && (ip6[53] & 0x03 != 0))")
+	}
 	ss.handle = handle
 
 	// start listen recv
@@ -150,27 +154,37 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) (er
 
 	// First off, get the MAC address we should be sending packets to.
 	var dstMac net.HardwareAddr
-	if ss.gwMac != nil {
-		dstMac = ss.gwMac
-	} else {
-		// 内网IP
-		mac := ss.watchMacCacheT.GetMac(ipStr)
-		if mac != nil {
-			dstMac = mac
+	if ss.srcMac != nil {
+		if ss.gwMac != nil {
+			dstMac = ss.gwMac
 		} else {
-			dstMac, err = ss.getHwAddr(dstIp)
-			if err != nil {
-				return
+			// 内网IP
+			mac := ss.watchMacCacheT.GetMac(ipStr)
+			if mac != nil {
+				dstMac = mac
+			} else {
+				dstMac, err = ss.getHwAddr(dstIp)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
 
 	// Construct all the network layers we need.
-	eth := layers.Ethernet{
-		SrcMAC:       ss.srcMac,
-		DstMAC:       dstMac,
-		EthernetType: layers.EthernetTypeIPv4,
+	var eth gopacket.SerializableLayer
+	if ss.srcMac == nil {
+		eth = &layers.Loopback{
+			Family: layers.ProtocolFamilyIPv4,
+		}
+	} else {
+		eth = &layers.Ethernet{
+			SrcMAC:       ss.srcMac,
+			DstMAC:       dstMac,
+			EthernetType: layers.EthernetTypeIPv4,
+		}
 	}
+
 	var ip4 *layers.IPv4
 	var ip6 *layers.IPv6
 	if dstIp.To4() != nil {
@@ -184,7 +198,11 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) (er
 			Protocol: layers.IPProtocolTCP,
 		}
 	} else {
-		eth.EthernetType = layers.EthernetTypeIPv6
+		if ss.srcMac == nil {
+			eth.(*layers.Loopback).Family = layers.ProtocolFamilyIPv6Linux
+		} else {
+			eth.(*layers.Ethernet).EthernetType = layers.EthernetTypeIPv6
+		}
 		ip6 = &layers.IPv6{
 			Version:    6,
 			NextHeader: layers.IPProtocolTCP,
@@ -229,10 +247,10 @@ func (ss *SynScanner) Scan(dstIp net.IP, dst uint16, ipOption port.IpOption) (er
 	// Send one packet per loop iteration until we've sent packets
 	if ip4 != nil {
 		tcp.SetNetworkLayerForChecksum(ip4)
-		ss.send(&eth, ip4, &tcp)
+		ss.send(eth, ip4, &tcp)
 	} else if ip6 != nil {
 		tcp.SetNetworkLayerForChecksum(ip6)
-		ss.send(&eth, ip6, &tcp)
+		ss.send(eth, ip6, &tcp)
 	}
 	return
 }
@@ -562,6 +580,9 @@ func (ss *SynScanner) sendArp(l ...gopacket.SerializableLayer) error {
 
 // recv packet on the network.
 func (ss *SynScanner) recv() {
+	loopback := layers.Loopback{
+		Family: layers.ProtocolFamilyIPv4,
+	}
 	eth := layers.Ethernet{
 		SrcMAC:       ss.srcMac,
 		DstMAC:       nil,
@@ -596,18 +617,32 @@ func (ss *SynScanner) recv() {
 	var tcpLayer layers.TCP
 	var arpLayer layers.ARP
 	var ethLayer layers.Ethernet
+	var loopbackLayer layers.Loopback
 	var foundLayerTypes []gopacket.LayerType
 
 	// Parse the packet.
-	parser := gopacket.NewDecodingLayerParser(
-		layers.LayerTypeEthernet,
-		&ethLayer,
-		&ipLayer,
-		&ipv6Layer,
-		&tcpLayer,
-		&arpLayer,
-		&ipv6IcmpNALayer,
-	)
+	var parser *gopacket.DecodingLayerParser
+	if ss.srcMac != nil {
+		parser = gopacket.NewDecodingLayerParser(
+			layers.LayerTypeEthernet,
+			&ethLayer,
+			&ipLayer,
+			&ipv6Layer,
+			&tcpLayer,
+			&arpLayer,
+			&ipv6IcmpNALayer,
+		)
+	} else {
+		parser = gopacket.NewDecodingLayerParser(
+			layers.LayerTypeLoopback,
+			&loopbackLayer,
+			&ipLayer,
+			&ipv6Layer,
+			&tcpLayer,
+			&arpLayer,
+			&ipv6IcmpNALayer,
+		)
+	}
 
 	// global var
 	var err error
@@ -657,13 +692,24 @@ func (ss *SynScanner) recv() {
 			continue
 		}
 
-		if ethLayer.EthernetType == layers.EthernetTypeIPv6 {
-			disIp = ipv6Layer.SrcIP
-			ip6.DstIP = disIp
-			eth.EthernetType = layers.EthernetTypeIPv6
+		if ss.srcMac != nil { // loopback
+			if ethLayer.EthernetType == layers.EthernetTypeIPv6 {
+				disIp = ipv6Layer.SrcIP
+				ip6.DstIP = disIp
+				eth.EthernetType = layers.EthernetTypeIPv6
+			} else {
+				disIp = ipLayer.SrcIP
+				ip4.DstIP = disIp
+			}
 		} else {
-			disIp = ipLayer.SrcIP
-			ip4.DstIP = disIp
+			if loopbackLayer.Family == layers.ProtocolFamilyIPv4 {
+				disIp = ipLayer.SrcIP
+				ip4.DstIP = disIp
+			} else {
+				disIp = ipv6Layer.SrcIP
+				ip6.DstIP = disIp
+				loopback.Family = layers.ProtocolFamilyIPv6Linux
+			}
 		}
 
 		// tcp Match ip and port
