@@ -364,11 +364,11 @@ func (ss *SynScanner) portProbeHandle() {
 				if _openIpPort.Port != 0 {
 					if _openIpPort.FingerPrint {
 						ss.WaitLimiter()
-						_openIpPort.Service, _openIpPort.Banner, _ = fingerprint.PortIdentify("tcp", _openIpPort.Ip, _openIpPort.Port, 2*time.Second)
+						_openIpPort.Service, _openIpPort.Banner, _ = fingerprint.PortIdentify("tcp", _openIpPort.Ip, _openIpPort.Port, time.Duration(ss.option.Timeout)*time.Millisecond)
 					}
 					if _openIpPort.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
 						ss.WaitLimiter()
-						_openIpPort.HttpInfo, _openIpPort.Banner, _ = fingerprint.ProbeHttpInfo(iputil.GetIpStr(_openIpPort.Ip), _openIpPort.Port, 2*time.Second)
+						_openIpPort.HttpInfo, _openIpPort.Banner, _ = fingerprint.ProbeHttpInfo(iputil.GetIpStr(_openIpPort.Ip), _openIpPort.Port, time.Duration(ss.option.Timeout)*time.Millisecond)
 						if _openIpPort.HttpInfo != nil {
 							if strings.HasPrefix(_openIpPort.HttpInfo.Url, "https") {
 								_openIpPort.Service = "https"
