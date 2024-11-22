@@ -276,6 +276,7 @@ func run(c *cli.Context) error {
 					break
 				}
 			}
+			time.Sleep(time.Millisecond)
 			s.Scan(ip, _port, ipOption)
 		}
 		if maxOpenPort > 0 {
