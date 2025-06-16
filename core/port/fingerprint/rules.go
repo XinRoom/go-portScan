@@ -13,7 +13,7 @@ var onlyRecv []string
 
 // 一组数据流，仅一次发送
 var groupFlows = map[string][]string{
-	"http": {"redis", "memcached"},
+	"http": {"redis", "memcached", "postgres"},
 }
 
 // 每个接收到的数据，均进行一次匹配
@@ -42,6 +42,7 @@ var portServiceOrder = map[uint16][]string{
 	1754:  {"oracle"},
 	3306:  {"mysql"},
 	3389:  {"ms-wbt-server"},
+	5432:  {"postgres"},
 	6379:  {"redis"},
 	9001:  {"mongodb"},
 	11211: {"memcached"},
@@ -374,6 +375,27 @@ func init() {
 					regexp.MustCompile(`(?s)^STAT pid \d`),
 					regexp.MustCompile(`(?s)^ERROR\r\n`),
 					regexp.MustCompile(`(?s)^SERVER_ERROR `),
+				},
+			},
+		},
+	}
+
+	// postgres
+	serviceRules["postgres"] = serviceRule{
+		Tls: false,
+		DataGroup: []ruleData{
+			{
+				ActionSend,
+				serviceRules["smb"].DataGroup[0].Data,
+				nil,
+			},
+			{
+				ActionRecv,
+				nil,
+				[]*regexp.Regexp{
+					regexp.MustCompile(`(?s)^E\0\0\0.S[^\0]+\0`),
+					regexp.MustCompile(`(?s)^E\0\0\0.SFATAL\0`),
+					regexp.MustCompile(`(?s)\0Munsupported frontend protocol `),
 				},
 			},
 		},
