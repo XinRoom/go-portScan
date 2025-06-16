@@ -175,6 +175,7 @@ type HttpInfo struct {
 	TlsCN      string   // tls使用者名称
 	TlsDNS     []string // tlsDNS列表
 	Fingers    []string // 识别到的web指纹
+	RemoteAddr string   // 远程地址
 }
 
 func (hi *HttpInfo) String() string {

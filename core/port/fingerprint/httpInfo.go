@@ -70,6 +70,7 @@ func WebHttpInfo(url2 string, dialTimeout time.Duration) (httpInfo *port.HttpInf
 		banner = b.Bytes()
 		//
 		httpInfo = new(port.HttpInfo)
+		httpInfo.RemoteAddr = resp.Request.RemoteAddr
 		httpInfo.Url = resp.Request.URL.String()
 		httpInfo.StatusCode = resp.StatusCode
 		httpInfo.ContentLen = int(resp.ContentLength)
