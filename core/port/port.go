@@ -150,10 +150,11 @@ func (op OpenIpPort) String() string {
 
 // ScannerOption 扫描器初始化参数
 type ScannerOption struct {
-	Rate    int    // 每秒速度限制, 单位: s, 会在1s内平均发送, 相当于每个包之间的延迟
-	Timeout int    // TCP连接响应延迟, 单位: ms
-	NextHop string // pcap dev name
-	Debug   bool
+	Rate     int    // 每秒速度限制, 单位: s, 会在1s内平均发送, 相当于每个包之间的延迟
+	MiniRate int    // 最小每秒速度，避免自动调速太低, 单位: s,  0为不设置
+	Timeout  int    // TCP连接响应延迟, 单位: ms
+	NextHop  string // pcap dev name
+	Debug    bool
 }
 
 // IpOption 对开放端口进一步处理参数

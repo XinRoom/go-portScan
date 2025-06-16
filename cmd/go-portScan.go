@@ -29,6 +29,7 @@ var (
 	pt          bool
 	sT          bool
 	rate        int
+	miniRate    int
 	sV          bool
 	timeout     int
 	rateP       int
@@ -55,6 +56,7 @@ func parseFlag(c *cli.Context) {
 	hostGroup = c.Int("hostGroup")
 	pt = c.Bool("PT")
 	rate = c.Int("rate")
+	miniRate = c.Int("miniRate")
 	sT = c.Bool("sT")
 	sV = c.Bool("sV")
 	timeout = c.Int("timeout")
@@ -220,10 +222,11 @@ func run(c *cli.Context) error {
 	// Initialize the Scanner
 	var s port.Scanner
 	option := port.ScannerOption{
-		Rate:    rate,
-		Timeout: timeout,
-		NextHop: nexthop,
-		Debug:   debug,
+		Rate:     rate,
+		MiniRate: miniRate,
+		Timeout:  timeout,
+		NextHop:  nexthop,
+		Debug:    debug,
 	}
 	ipOption := port.IpOption{
 		FingerPrint: sV,
@@ -402,6 +405,12 @@ func main() {
 				Name:    "rate",
 				Aliases: []string{"r"},
 				Usage:   fmt.Sprintf("number of packets sent per second. If set -1, TCP-mode is %d, SYN-mode is %d(SYN-mode is restricted by the network adapter, 2000=1M)", tcp.DefaultTcpOption.Rate, syn.DefaultSynOption.Rate),
+				Value:   -1,
+			},
+			&cli.IntFlag{
+				Name:    "miniRate",
+				Aliases: []string{"mr"},
+				Usage:   fmt.Sprintf("min number of packets sent per second. "),
 				Value:   -1,
 			},
 			&cli.BoolFlag{

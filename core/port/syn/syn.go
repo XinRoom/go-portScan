@@ -333,6 +333,8 @@ func (ss *SynScanner) changeLimiter() {
 		}
 		if rate > ss.option.Rate {
 			rate = ss.option.Rate
+		} else if rate < ss.option.MiniRate {
+			rate = ss.option.MiniRate
 		}
 		ss.lastRate = rate
 		if ss.option.Debug {
