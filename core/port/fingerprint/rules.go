@@ -13,7 +13,8 @@ var onlyRecv []string
 
 // 一组数据流，仅一次发送
 var groupFlows = map[string][]string{
-	"http": {"redis", "memcached", "postgres"},
+	"http": {"redis", "memcached"},
+	"smb":  {"postgres"},
 }
 
 // 每个接收到的数据，均进行一次匹配
