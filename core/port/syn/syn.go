@@ -52,6 +52,8 @@ type SynScanner struct {
 	// stat
 	lastStatProbeTime time.Time
 	lastRate          int
+	lastMaxTokenTimes int // 连续最大可用Token次数
+	lastMinTokenTimes int // 连续最小可用Token次数
 }
 
 // NewSynScanner firstIp: Used to select routes; openPortChan: Result return channel
@@ -323,10 +325,6 @@ func (ss *SynScanner) changeLimiter() {
 	}
 	ss.lastStatProbeTime = time.Now()
 
-	if ss.option.Debug {
-		fmt.Println("[d] limiter tokens:", ss.limiter.Tokens())
-	}
-
 	var setLimit = func(rate int) {
 		if rate <= 0 {
 			rate = 10
@@ -343,15 +341,45 @@ func (ss *SynScanner) changeLimiter() {
 		ss.limiter.SetLimit(limiter.Every(time.Second / time.Duration(rate)))
 	}
 
-	// 与recv协同，当队列缓冲区到达80%时降半速，90%将为10/s
-	if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*9 {
-		setLimit(10)
-	} else if len(ss.openPortChan)*10 >= cap(ss.openPortChan)*8 {
-		setLimit(ss.lastRate / 2)
-	} else if ss.limiter.Tokens() > 0 { // 通过判断limiter是否还有可使用Tokens，判断发送速度是否是贴着网卡最大发送速度，理想情况下应该为网卡最大处理速度小一点
-		setLimit(ss.lastRate - int(ss.limiter.Tokens()) - 10)
-	} else if ss.limiter.Tokens() < -50 { // 恢复速度到使端口发包等待30个组(tokens 会为负数)
-		setLimit(ss.lastRate - int(ss.limiter.Tokens()) - 10)
+	// 计算recv队列使用率（乘以10的整数）
+	ratio10 := (len(ss.openPortChan) * 10) / cap(ss.openPortChan)
+	// 当队列缓冲区到达80%时减少队列长度的50%，90%降为100/s
+	if ratio10 >= 9 {
+		setLimit(100)
+	} else if ratio10 >= 8 {
+		setLimit(ss.lastRate - cap(ss.openPortChan)/2)
+	} else {
+		aTokens := int(ss.limiter.Tokens()) // 通过判断limiter是否还有可使用Tokens，判断发送速度是否是贴着网卡最大发送速度，理想情况下应该为网卡最大处理速度小一点
+		if ss.option.Debug {
+			fmt.Println("[d] limiter tokens:", aTokens)
+		}
+		if aTokens > 0 {
+			if (aTokens+1)*10 >= ss.option.Rate { // 最大可用token连续出现次数
+				if ss.lastMaxTokenTimes < 8 {
+					ss.lastMaxTokenTimes++
+				}
+			} else {
+				ss.lastMaxTokenTimes = 0
+			}
+			if ss.lastMaxTokenTimes > 1 {
+				setLimit(ss.lastRate - aTokens*ss.lastMaxTokenTimes)
+			} else {
+				setLimit(ss.lastRate - aTokens - 10)
+			}
+		} else if aTokens < -50 { // 恢复速度到使端口发包等待50个组(tokens 会为负数)
+			if aTokens+1 <= 196 { // 最小可用token连续出现次数
+				if ss.lastMinTokenTimes < 8 {
+					ss.lastMinTokenTimes++
+				}
+			} else {
+				ss.lastMinTokenTimes = 0
+			}
+			if ss.lastMinTokenTimes > 1 {
+				setLimit(ss.lastRate - aTokens*ss.lastMinTokenTimes)
+			} else {
+				setLimit(ss.lastRate - aTokens - 10)
+			}
+		}
 	}
 }
 
