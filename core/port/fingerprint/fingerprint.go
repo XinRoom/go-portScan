@@ -87,6 +87,8 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 		}
 	}
 
+	var lastDailTime time.Duration
+
 	// onlyRecv
 	{
 		var conn net.Conn
@@ -96,11 +98,19 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 			readBufPool.Put(buf)
 		}()
 		address := fmt.Sprintf("%s:%d", iputil.GetIpStr(ip), _port)
+		now := time.Now()
 		conn, _ = net.DialTimeout(network, address, dailTimeout)
 		if conn == nil {
 			return unknown, banner, true
 		}
-		n, _ = read(conn, buf)
+		lastDailTime = time.Since(now) * 2
+		if lastDailTime < dailTimeout {
+			dailTimeout = lastDailTime
+			if dailTimeout < 250*time.Millisecond {
+				dailTimeout = 250 * time.Millisecond
+			}
+		}
+		n, _ = read(conn, buf, dailTimeout)
 		conn.Close()
 		if n != 0 {
 			banner = buf[:n]
@@ -233,10 +243,10 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 
 		if rule.Action == ActionSend {
 			if isTls {
-				connTls.SetWriteDeadline(time.Now().Add(time.Second))
+				connTls.SetWriteDeadline(time.Now().Add(dailTimeout))
 				_, err = connTls.Write(data)
 			} else {
-				conn.SetWriteDeadline(time.Now().Add(time.Second))
+				conn.SetWriteDeadline(time.Now().Add(dailTimeout))
 				_, err = conn.Write(data)
 			}
 			if err != nil {
@@ -246,9 +256,9 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 		} else {
 			var n int
 			if isTls {
-				n, err = read(connTls, buf)
+				n, err = read(connTls, buf, dailTimeout)
 			} else {
-				n, err = read(conn, buf)
+				n, err = read(conn, buf, dailTimeout)
 			}
 			// 出错就退出
 			if n == 0 {
@@ -287,13 +297,13 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 	return
 }
 
-func read(conn interface{}, buf []byte) (int, error) {
+func read(conn interface{}, buf []byte, timeout time.Duration) (int, error) {
 	switch conn.(type) {
 	case net.Conn:
-		conn.(net.Conn).SetReadDeadline(time.Now().Add(time.Second))
+		conn.(net.Conn).SetReadDeadline(time.Now().Add(timeout))
 		return conn.(net.Conn).Read(buf[:])
 	case *tls.Conn:
-		conn.(*tls.Conn).SetReadDeadline(time.Now().Add(time.Second))
+		conn.(*tls.Conn).SetReadDeadline(time.Now().Add(timeout))
 		return conn.(*tls.Conn).Read(buf[:])
 	}
 	return 0, errors.New("unknown type")
