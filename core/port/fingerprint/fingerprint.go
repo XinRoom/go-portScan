@@ -63,6 +63,17 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 	unknown := "unknown"
 	var sn string
 
+	defer func() {
+		if sn == "http" && bytes.HasPrefix(banner, []byte("HTTP/1.1 400")) {
+			sn2, banner2, isDailErr2 := matchRule(network, ip, _port, "https", dailTimeout)
+			if !isDailErr && sn2 != "" {
+				sn = sn2
+				banner = banner2
+				isDailErr = isDailErr2
+			}
+		}
+	}()
+
 	// 优先判断port可能的服务
 	if serviceNames, ok := portServiceOrder[_port]; ok {
 		for _, service := range serviceNames {
