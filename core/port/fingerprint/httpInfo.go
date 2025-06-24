@@ -9,7 +9,9 @@ import (
 	"github.com/XinRoom/go-portScan/util"
 	"github.com/XinRoom/go-portScan/util/httputil"
 	"io"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -30,7 +32,7 @@ func ProbeHttpInfo(host string, _port uint16, dialTimeout time.Duration) (httpIn
 	var url2 string
 
 	for _, scheme := range schemes {
-		url2 = fmt.Sprintf("%s://%s:%d/", scheme, host, _port)
+		url2 = fmt.Sprintf("%s://%s/", scheme, net.JoinHostPort(host, strconv.Itoa(int(_port))))
 
 		httpInfo, banner, isDailErr = WebHttpInfo(url2, dialTimeout)
 		if isDailErr {

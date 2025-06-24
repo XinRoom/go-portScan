@@ -3,11 +3,11 @@ package host
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/go-ping/ping"
 	"net"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -98,7 +98,7 @@ func TcpPing(host string, ports []uint16, timeout time.Duration) (ok bool) {
 		time.Sleep(10 * time.Millisecond)
 		wg.Add(1)
 		go func(_port uint16) {
-			conn, err := d.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", host, _port))
+			conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(int(_port))))
 			if conn != nil {
 				conn.Close()
 				ok = true
