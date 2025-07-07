@@ -68,6 +68,7 @@ func GetBody(resp *http.Response) (body []byte, err error) {
 		reader = resp.Body
 	}
 	if err == nil {
+		resp.Header.Del("Content-Encoding")
 		body, err = readMaxSize(reader, 300*1024) // Max Size 300kb
 	}
 	return
