@@ -134,9 +134,7 @@ type OpenIpPort struct {
 
 func (op OpenIpPort) String() string {
 	buf := strings.Builder{}
-	buf.WriteString(op.Ip.String())
-	buf.WriteString(":")
-	buf.WriteString(strconv.Itoa(int(op.Port)))
+	buf.WriteString(net.JoinHostPort(op.Ip.String(), strconv.Itoa(int(op.Port))))
 	if op.Service != "" {
 		buf.WriteString(" ")
 		buf.WriteString(op.Service)
