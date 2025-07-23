@@ -182,7 +182,7 @@ func main() {
 Http Web Cms Finger
 ```go
 // "github.com/XinRoom/go-portScan/core/port/fingerprint"
-func ProbeHttpInfo(host string, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {}
+func ProbeHttpInfo(host string, _port uint16, topScheme string, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {}
 func WebHttpInfo(url2 string, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {}
 
 // "github.com/XinRoom/go-portScan/core/port/fingerprint/webfinger"

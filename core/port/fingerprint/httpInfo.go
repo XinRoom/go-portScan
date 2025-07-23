@@ -20,10 +20,10 @@ var httpsTopPort = []uint16{443, 4443, 1443, 8443}
 
 var httpClient *http.Client
 
-func ProbeHttpInfo(host string, _port uint16, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
+func ProbeHttpInfo(host string, _port uint16, topScheme string, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
 	var schemes []string
 
-	if util.IsUint16InList(_port, httpsTopPort) {
+	if util.IsUint16InList(_port, httpsTopPort) || topScheme == "https" {
 		schemes = []string{"https", "http"}
 	} else {
 		schemes = []string{"http", "https"}
@@ -34,13 +34,19 @@ func ProbeHttpInfo(host string, _port uint16, dialTimeout time.Duration) (httpIn
 	for _, scheme := range schemes {
 		url2 = fmt.Sprintf("%s://%s/", scheme, net.JoinHostPort(host, strconv.Itoa(int(_port))))
 
-		httpInfo, banner, isDailErr = WebHttpInfo(url2, dialTimeout)
+		var httpInfo2 *port.HttpInfo
+		var banner2 []byte
+		httpInfo2, banner2, isDailErr = WebHttpInfo(url2, dialTimeout, true)
 		if isDailErr {
 			return
 		}
 
-		if httpInfo != nil && httpInfo.StatusCode != 400 {
-			break
+		if httpInfo2 != nil {
+			httpInfo = httpInfo2
+			banner = banner2
+			if httpInfo2.StatusCode != 400 {
+				break
+			}
 		}
 	}
 

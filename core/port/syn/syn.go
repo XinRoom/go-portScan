@@ -397,7 +397,7 @@ func (ss *SynScanner) portProbeHandle() {
 					}
 					if _openIpPort.Httpx && (_openIpPort.Service == "" || _openIpPort.Service == "http" || _openIpPort.Service == "https") {
 						ss.WaitLimiter()
-						_openIpPort.HttpInfo, _openIpPort.Banner, _ = fingerprint.ProbeHttpInfo(_openIpPort.Ip.String(), _openIpPort.Port, time.Duration(ss.option.Timeout)*time.Millisecond)
+						_openIpPort.HttpInfo, _openIpPort.Banner, _ = fingerprint.ProbeHttpInfo(_openIpPort.Ip.String(), _openIpPort.Port, _openIpPort.Service, time.Duration(ss.option.Timeout)*time.Millisecond)
 						if _openIpPort.HttpInfo != nil {
 							if strings.HasPrefix(_openIpPort.HttpInfo.Url, "https") {
 								_openIpPort.Service = "https"
