@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
-	"fmt"
-	"github.com/XinRoom/go-portScan/util/iputil"
 	"net"
 	"reflect"
 	"regexp"
@@ -97,7 +95,7 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 		defer func() {
 			readBufPool.Put(buf)
 		}()
-		address := fmt.Sprintf("%s:%d", iputil.GetIpStr(ip), _port)
+		address := net.JoinHostPort(ip.String(), strconv.Itoa(int(_port)))
 		now := time.Now()
 		conn, _ = net.DialTimeout(network, address, dailTimeout)
 		if conn == nil {
@@ -113,7 +111,8 @@ func PortIdentify(network string, ip net.IP, _port uint16, dailTimeout time.Dura
 		n, _ = read(conn, buf, dailTimeout)
 		conn.Close()
 		if n != 0 {
-			banner = buf[:n]
+			banner = make([]byte, n)
+			copy(banner, buf[:n])
 			for _, service := range onlyRecv {
 				_, ok := matchedRule[service]
 				if ok {
@@ -194,7 +193,7 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 	var conn net.Conn
 	var connTls *tls.Conn
 
-	address := fmt.Sprintf("%s:%d", iputil.GetIpStr(ip), _port)
+	address := net.JoinHostPort(ip.String(), strconv.Itoa(int(_port)))
 
 	serviceRule2 := serviceRules[serviceName]
 	flowsService := groupFlows[serviceName]
@@ -264,7 +263,8 @@ func matchRule(network string, ip net.IP, _port uint16, serviceName string, dail
 			if n == 0 {
 				return
 			}
-			banner = buf[:n]
+			banner = make([]byte, n)
+			copy(banner, buf[:n])
 			// 包含数据就正确
 			if matchRuleWhithBuf(buf[:n], ip, _port, rule) {
 				serviceNameRet = serviceName
