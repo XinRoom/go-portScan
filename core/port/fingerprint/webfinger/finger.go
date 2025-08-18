@@ -18,6 +18,7 @@ type Date struct {
 	Location string
 	Method   string
 	Keyword  []string
+	Or       bool
 }
 
 type WebFinger struct {
@@ -79,11 +80,11 @@ func WebFingerIdent(resp *http.Response) (names []string) {
 			}
 			switch finger2.Method {
 			case "keyword":
-				if iskeyword(dataMap[finger2.Location], finger2.Keyword) {
+				if iskeyword(dataMap[finger2.Location], finger2.Keyword, finger2.Or) {
 					flag = true
 				}
 			case "regular":
-				if isregular(dataMap[finger2.Location], finger2.Keyword) {
+				if isregular(dataMap[finger2.Location], finger2.Keyword, finger2.Or) {
 					flag = true
 				}
 			}
@@ -100,14 +101,12 @@ func WebFingerIdent(resp *http.Response) (names []string) {
 }
 
 // WebFingerIdentByFavicon web系统指纹识别,通过Favicon.ico
-func WebFingerIdentByFavicon(body []byte) (names []string) {
-	var data string
-	data = mmh3Hash32(standBase64(body))
+func WebFingerIdentByFavicon(hash string) (names []string) {
 	for _, finger := range WebFingers {
 		for _, finger2 := range finger.Fingers {
 			switch finger2.Method {
 			case "faviconhash":
-				if data != "" && len(finger2.Keyword) > 0 && data == finger2.Keyword[0] {
+				if hash != "" && len(finger2.Keyword) > 0 && hash == finger2.Keyword[0] {
 					if finger2.Name != "" {
 						finger.Name += "," + finger2.Name
 					}
@@ -118,4 +117,8 @@ func WebFingerIdentByFavicon(body []byte) (names []string) {
 		}
 	}
 	return
+}
+
+func WebFaviconHash(body []byte) string {
+	return mmh3Hash32(standBase64(body))
 }

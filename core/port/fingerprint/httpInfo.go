@@ -53,7 +53,7 @@ func ProbeHttpInfo(host string, _port uint16, topScheme string, dialTimeout time
 	return
 }
 
-func WebHttpInfo(url2 string, dialTimeout time.Duration) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
+func WebHttpInfo(url2 string, dialTimeout time.Duration, favicon bool) (httpInfo *port.HttpInfo, banner []byte, isDailErr bool) {
 	if httpClient == nil {
 		httpClient = httputil.NewHttpClient(dialTimeout)
 	}
@@ -65,7 +65,7 @@ func WebHttpInfo(url2 string, dialTimeout time.Duration) (httpInfo *port.HttpInf
 	var b bytes.Buffer
 	defer b.Reset()
 
-	resps, body, err = getReq(url2, 3)
+	resps, body, err = getReq(url2, 1)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "timeout") || strings.Contains(err.Error(), refusedStr) {
 			return nil, banner, true
@@ -73,8 +73,17 @@ func WebHttpInfo(url2 string, dialTimeout time.Duration) (httpInfo *port.HttpInf
 	}
 	if len(resps) > 0 {
 		resp := resps[len(resps)-1]
+		for i := len(resps) - 1; i >= 0; i-- {
+			if resps[i] != nil && resps[i].StatusCode == 200 && resps[i].Body != nil {
+				body, _ = httputil.GetBody(resps[i])
+				resps[i].Body = io.NopCloser(bytes.NewReader(body))
+				resp = resps[i]
+				break
+			}
+		}
 		b.Reset()
 		resp.Write(&b)
+		resp.Body = io.NopCloser(bytes.NewReader(body))
 		banner = b.Bytes()
 		//
 		httpInfo = new(port.HttpInfo)
@@ -92,17 +101,24 @@ func WebHttpInfo(url2 string, dialTimeout time.Duration) (httpInfo *port.HttpInf
 			httpInfo.TlsDNS = resp.TLS.PeerCertificates[0].DNSNames
 		}
 		// finger
-		resp.Body = io.NopCloser(bytes.NewReader(body))
-		httpInfo.Fingers = webfinger.WebFingerIdent(resp)
+		for i := 0; i < len(resps); i++ {
+			httpInfo.Fingers = append(httpInfo.Fingers, webfinger.WebFingerIdent(resps[i])...)
+		}
 		// favicon
-		fau := webfinger.FindFaviconUrl(string(body))
-		if fau != "" {
+		if favicon {
+			fau := webfinger.FindFaviconUrl(string(banner))
+			if fau == "" {
+				resp.Request.URL.Path = "/favicon.ico"
+				fau = resp.Request.URL.String()
+			}
 			if !strings.HasPrefix(fau, "http") {
 				fau = resp.Request.URL.String() + fau
 			}
-			_, body2, err2 := getReq(fau, 3)
-			if err2 == nil && len(body2) != 0 {
-				httpInfo.Fingers = append(httpInfo.Fingers, webfinger.WebFingerIdentByFavicon(body2)...)
+			resps2, body2, err2 := getReq(fau, 0)
+			if err2 == nil && len(body2) != 0 && len(resps2) > 0 && resps2[0].StatusCode == 200 && strings.Contains(resps2[0].Header.Get("Content-Type"), "image") {
+				httpInfo.Favicon = body2
+				httpInfo.FaviconHash = webfinger.WebFaviconHash(body2)
+				httpInfo.Fingers = append(httpInfo.Fingers, webfinger.WebFingerIdentByFavicon(httpInfo.FaviconHash)...)
 			}
 		}
 	}

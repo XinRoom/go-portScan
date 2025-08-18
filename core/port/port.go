@@ -164,15 +164,17 @@ type IpOption struct {
 
 // HttpInfo Http服务基础信息
 type HttpInfo struct {
-	StatusCode int      // 状态码
-	ContentLen int      // 相应包大小
-	Url        string   // Url
-	Location   string   // 302、301重定向路径
-	Title      string   // 标题
-	Server     string   // 服务名
-	TlsCN      string   // tls使用者名称
-	TlsDNS     []string // tlsDNS列表
-	Fingers    []string // 识别到的web指纹
+	StatusCode  int      // 状态码
+	ContentLen  int      // 相应包大小
+	Url         string   // Url
+	Location    string   // 302、301重定向路径
+	Title       string   // 标题
+	Server      string   // 服务名
+	TlsCN       string   // tls使用者名称
+	TlsDNS      []string // tlsDNS列表
+	Fingers     []string // 识别到的web指纹
+	Favicon     []byte   // favicon
+	FaviconHash string   // faviconHash
 }
 
 func (hi *HttpInfo) String() string {
