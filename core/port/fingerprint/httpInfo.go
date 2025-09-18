@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"strconv"
 	"strings"
 	"time"
@@ -90,6 +91,7 @@ func WebHttpInfo(url2 string, dialTimeout time.Duration, favicon bool) (httpInfo
 		httpInfo.Url = resp.Request.URL.String()
 		httpInfo.StatusCode = resp.StatusCode
 		httpInfo.ContentLen = int(resp.ContentLength)
+		httpInfo.RemoteAddr = resp.Request.RemoteAddr
 		rewriteUrl, err := resp.Location()
 		if err == nil {
 			httpInfo.Location = rewriteUrl.String()
@@ -130,10 +132,17 @@ func getReq(url2 string, maxRewriteNum int) (resps []*http.Response, body []byte
 	var req *http.Request
 	for {
 		var resp *http.Response
+		var connectAddr string
+		trace := &httptrace.ClientTrace{
+			ConnectStart: func(net, addr string) {
+				connectAddr = addr
+			},
+		}
 		req, err = http.NewRequest(http.MethodGet, url2, http.NoBody)
 		if err != nil {
 			return
 		}
+		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
 		req.Header.Set("Accept-Encoding", "gzip, deflate")
 		req.Close = true // disable keepalive
@@ -144,6 +153,7 @@ func getReq(url2 string, maxRewriteNum int) (resps []*http.Response, body []byte
 			}
 			return
 		}
+		resp.Request.RemoteAddr = connectAddr
 		resps = append(resps, resp)
 		if resp.Body != http.NoBody && resp.Body != nil {
 			body, _ = httputil.GetBody(resp)

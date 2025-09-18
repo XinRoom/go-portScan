@@ -175,6 +175,7 @@ type HttpInfo struct {
 	Fingers     []string // 识别到的web指纹
 	Favicon     []byte   // favicon
 	FaviconHash string   // faviconHash
+	RemoteAddr  string   // RemoteAddr
 }
 
 func (hi *HttpInfo) String() string {
