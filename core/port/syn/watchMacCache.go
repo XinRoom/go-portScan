@@ -51,7 +51,6 @@ func (w *watchMacCacheTable) SetMac(ip string, mac net.HardwareAddr) {
 		wi.Mac = mac
 	} else {
 		w.watchMacC[ip] = &watchMacCache{LastTime: lastTime, Mac: mac}
-		wi.Mac = mac
 	}
 	w.lock.Unlock()
 }
