@@ -135,7 +135,7 @@ func getReq(url2 string, maxRewriteNum int) (resps []*http.Response, body []byte
 		var connectAddr string
 		trace := &httptrace.ClientTrace{
 			ConnectStart: func(net, addr string) {
-				connectAddr = addr
+				connectAddr = strings.Split(addr, ":")[0]
 			},
 		}
 		req, err = http.NewRequest(http.MethodGet, url2, http.NoBody)
