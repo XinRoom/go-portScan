@@ -1,6 +1,7 @@
 package port
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/XinRoom/go-portScan/util"
@@ -124,12 +125,12 @@ type Scanner interface {
 
 // OpenIpPort retChan
 type OpenIpPort struct {
-	Ip       net.IP
-	Port     uint16
-	Service  string
-	Banner   []byte
-	HttpInfo *HttpInfo
-	IpOption
+	Ip       net.IP    `json:"ip"`
+	Port     uint16    `json:"port"`
+	Service  string    `json:"service"`
+	Banner   []byte    `json:"banner,omitempty"`
+	HttpInfo *HttpInfo `json:"http_info,omitempty"`
+	IpOption           `json:"-"`
 }
 
 func (op OpenIpPort) String() string {
@@ -144,6 +145,11 @@ func (op OpenIpPort) String() string {
 		buf.WriteString(op.HttpInfo.String())
 	}
 	return buf.String()
+}
+
+func (op OpenIpPort) Json() string {
+	o, _ := json.Marshal(op)
+	return string(o)
 }
 
 // ScannerOption 扫描器初始化参数
@@ -164,18 +170,18 @@ type IpOption struct {
 
 // HttpInfo Http服务基础信息
 type HttpInfo struct {
-	StatusCode  int      // 状态码
-	ContentLen  int      // 相应包大小
-	Url         string   // Url
-	Location    string   // 302、301重定向路径
-	Title       string   // 标题
-	Server      string   // 服务名
-	TlsCN       string   // tls使用者名称
-	TlsDNS      []string // tlsDNS列表
-	Fingers     []string // 识别到的web指纹
-	Favicon     []byte   // favicon
-	FaviconHash string   // faviconHash
-	RemoteAddr  string   // RemoteAddr
+	StatusCode  int      `json:"status_code"`  // 状态码
+	ContentLen  int      `json:"content_len"`  // 相应包大小
+	Url         string   `json:"url"`          // Url
+	Location    string   `json:"location"`     // 302、301重定向路径
+	Title       string   `json:"title"`        // 标题
+	Server      string   `json:"server"`       // 服务名
+	TlsCN       string   `json:"tls_cn"`       // tls使用者名称
+	TlsDNS      []string `json:"tls_dns"`      // tlsDNS列表
+	Fingers     []string `json:"fingers"`      // 识别到的web指纹
+	Favicon     []byte   `json:"-"`            // favicon
+	FaviconHash string   `json:"favicon_hash"` // faviconHash
+	RemoteAddr  string   `json:"remote_addr"`  // RemoteAddr
 }
 
 func (hi *HttpInfo) String() string {

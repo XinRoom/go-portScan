@@ -43,6 +43,7 @@ var (
 	oCsv        string
 	oFile       string
 	debug       bool
+	oJson       bool
 )
 
 func parseFlag(c *cli.Context) {
@@ -66,6 +67,7 @@ func parseFlag(c *cli.Context) {
 	oCsv = c.String("oCsv")
 	oFile = c.String("oFile")
 	debug = c.Bool("debug")
+	oJson = c.Bool("json")
 }
 
 func run(c *cli.Context) error {
@@ -199,7 +201,11 @@ func run(c *cli.Context) error {
 				}
 				ipPortNumRW.Unlock()
 			}
-			myLog.Println(ret.String())
+			if oJson {
+				myLog.Println(ret.Json())
+			} else {
+				myLog.Println(ret.String())
+			}
 			if csvWrite != nil {
 				line := []string{ret.Ip.String(), strconv.Itoa(int(ret.Port)), ret.Service, "", "", "", "", "", "", ""}
 				line[3] = strings.NewReplacer("\\r", "\r", "\\n", "\n").Replace(strings.Trim(strconv.Quote(string(ret.Banner)), "\""))
@@ -445,6 +451,12 @@ func main() {
 				Aliases: []string{"oC"},
 				Usage:   "output csv file",
 				Value:   "",
+			},
+			&cli.BoolFlag{
+				Name:    "json",
+				Aliases: []string{"j"},
+				Usage:   "output json format",
+				Value:   false,
 			},
 			&cli.StringFlag{
 				Name:    "oFile",
